@@ -1,5 +1,4 @@
-"""Metadata parser for Prusa Slicer g-code files. Extracts preview pictures
-as well.
+"""Gcode-metadata tool for g-code files. Extracts preview pictures as well.
 """
 from time import time, sleep
 
@@ -9,7 +8,19 @@ import os
 from typing import Dict, Any
 from logging import getLogger
 
+__version__ = "0.1.0"
+__date__ = "14 Mar 2022"  # version date
+__copyright__ = "(c) 2021 Prusa 3D"
+__author_name__ = "Michal Zoubek"
+__author_email__ = "link@prusa3d.com"
+__author__ = f"{__author_name__} <{__author_email__}>"
+__description__ = "Python library for extraction of metadata from g-code files"
+
+__credits__ = "Ondřej Tůma, Martin Užák, Michal Zoubek, Tomáš Jozífek"
+__url__ = "https://github.com/ondratu/gcode-metadata"
+
 GCODE_EXTENSIONS = (".gcode", ".gc", ".g", ".gco")
+CHARS_TO_REMOVE = ["/", "\\", "\"", "(", ")", "[", "]", "'"]
 
 log = getLogger("connect-printer")
 
@@ -20,13 +31,25 @@ RE_ESTIMATED = re.compile(r"((?P<days>[0-9]+)d\s*)?"
                           r"((?P<seconds>[0-9]+)s)?")
 
 
+def simplify(key):
+    """Remove specific characters from input"""
+    key = key.strip()
+    for char in key:
+        if char == " ":
+            key = key.replace(char, "_")
+        elif char in CHARS_TO_REMOVE:
+            key = key.replace(char, "")
+    return key
+
+
 class UnknownGcodeFileType(ValueError):
     # pylint: disable=missing-class-docstring
     ...
 
+
 def check_gcode_completion(path):
-    # TODO implement
-    pass
+    """Check g-code integrity"""
+    log.debug(path)
 
 
 def thumbnail_from_bytes(data_input):
@@ -184,7 +207,7 @@ class MetaData:
         match `self.Attr` in `self.data`.
         """
         for attr, conv in self.Attrs.items():
-            val = data.get(attr)
+            val = data.get(attr) or data.get(simplify(attr))
             if val:
                 try:
                     self.data[attr] = conv(val)
@@ -202,6 +225,8 @@ class FDMMetaData(MetaData):
     """Class for extracting Metadata for FDM gcodes"""
 
     # Metadata we are looking for and respective conversion functions
+
+    # These keys are primary defined by PrusaSlicer
     Attrs = {
         "filament used [mm]": float,
         "filament used [cm3]": float,
@@ -217,7 +242,7 @@ class FDMMetaData(MetaData):
         "brim_width": int,
         "temperature": int,
         "support_material": int,
-        "ironing": int,
+        "ironing": int
     }
 
     KEY_VAL_PAT = re.compile("; (?P<key>.*?) = (?P<value>.*)$")
@@ -404,6 +429,7 @@ class FDMMetaData(MetaData):
                 return False
 
         return True
+
 
 def get_metadata(path: str, save_cache=True):
     """Returns the Metadata for given `path`
