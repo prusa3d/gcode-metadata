@@ -1,10 +1,11 @@
+"""Tests for gcode-metadata tool for g-code files."""
 import os
-import pytest
 import tempfile
 import shutil
 import time
+import pytest
 
-from core.metadata import get_metadata, UnknownGcodeFileType, MetaData
+from metadata import get_metadata, UnknownGcodeFileType, MetaData
 
 gcodes_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                           "gcodes")
@@ -12,6 +13,7 @@ gcodes_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),
 
 @pytest.fixture
 def tmp_dir():
+    """Temporary directory creation fixture"""
     temp = tempfile.TemporaryDirectory()
     yield temp.name
     del temp
