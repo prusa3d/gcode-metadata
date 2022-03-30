@@ -102,7 +102,7 @@ class TestFDNMetaData:
         """Both the file and filename contain metadata. There are thumbnails.
         """
         fn = os.path.join(gcodes_dir, "fdn_full_0.15mm_PETG_MK3S_2h6m.gcode")
-        meta = get_metadata(fn, False)
+        meta = get_metadata(fn, line=None, save_cache=False)
         assert meta.data == {
             'bed_temperature': 90,
             'brim_width': 0,
@@ -122,11 +122,19 @@ class TestFDNMetaData:
         }
         assert len(meta.thumbnails['640x480']) == 158644
 
+    def test_get_from_line(self):
+        fn = os.path.join(gcodes_dir, "fdn_full_0.15mm_PETG_MK3S_2h6m.gcode")
+        meta = get_metadata(fn,
+                            line="; bed_temperature = 90\n",
+                            save_cache=False)
+        assert meta.data == {'bed_temperature': 90}
+        assert len(meta.data) == 1
+
     def test_only_path(self):
         """Only the filename contains metadata. There are no thumbnails."""
         fn = os.path.join(gcodes_dir,
                           "fdn_only_filename_0.25mm_PETG_MK3S_2h9m.gcode")
-        meta = get_metadata(fn, False)
+        meta = get_metadata(fn, line=None, save_cache=False)
         assert meta.data == {
             'estimated printing time (normal mode)': '2h9m',
             'filament_type': 'PETG',
@@ -138,7 +146,7 @@ class TestFDNMetaData:
     def test_fdn_all_empty(self):
         """Only the file contains metadata. There are thumbnails."""
         fn = os.path.join(gcodes_dir, "fdn_all_empty.gcode")
-        meta = get_metadata(fn, False)
+        meta = get_metadata(fn, line=None, save_cache=False)
         assert not meta.data
         assert not meta.thumbnails
         assert meta.path == fn

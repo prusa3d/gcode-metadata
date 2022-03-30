@@ -176,17 +176,32 @@ class MetaData:
             raise ValueError(
                 "JSON data not found or in incorrect format") from err
 
-    def load(self, save_cache=True):
+    def load(self, line: str = False, save_cache=True):
         """Extract and set metadata from `self.path`. Any metadata
         obtained from the path will be overwritten by metadata from
         the file if the metadata is contained there as well"""
         if self.is_cache_fresh():
             self.load_cache()
         else:
-            self.load_from_path(self.path)
-            self.load_from_file(self.path)
+            if line:
+                self.load_from_line(self.path, line)
+            else:
+                self.load_from_path(self.path)
+                self.load_from_file(self.path)
             if save_cache:
                 self.save_cache()
+
+    def load_from_line(self, path: str, line: str):
+        """Load metadata from single line
+        :path: Path to the file to load the metadata from
+        :line: Which metadata line to look for
+        """
+
+    def from_line(self, data: ParsedData, line: str):
+        """
+        Parses data out of a given line
+        data variable is used to store all temporary data
+        """
 
     def load_from_file(self, path: str):
         """Load metadata and thumbnails from given `path`"""
@@ -333,6 +348,18 @@ class FDMMetaData(MetaData):
                 key, val = match.groups()
                 data.meta[key] = val
 
+    def load_from_line(self, path: str, line: str):
+        """Load metadata from single line
+        :path: Path to the file to load the metadata from
+        :line: Which metadata line to look for
+        """
+        data = ParsedData()
+        with open(path, "r", encoding='utf-8') as file_descriptor:
+            for line_ in file_descriptor:
+                if line_ == line:
+                    self.from_line(data, line)
+            self.set_data(data.meta)
+
     def load_from_file(self, path):
         """Load metadata from file
         Tries to use the quick_parse function. If it keeps failing,
@@ -431,11 +458,12 @@ class FDMMetaData(MetaData):
         return True
 
 
-def get_metadata(path: str, save_cache=True):
+def get_metadata(path: str, line: str = None, save_cache=True):
     """Returns the Metadata for given `path`
 
     :param path: Gcode file
     :param save_cache: Boolean if cache should be saved
+    :param line: Which metadata line to look for
     """
     # pylint: disable=redefined-outer-name
     fnl = path.lower()
@@ -445,7 +473,7 @@ def get_metadata(path: str, save_cache=True):
     else:
         raise UnknownGcodeFileType(path)
 
-    meta.load(save_cache)
+    meta.load(line, save_cache)
     return meta
 
 
