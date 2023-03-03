@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name='gcode-metadata',
     version='0.1.0',
-    packages=['tests'],
+    packages=['gcode_metadata'],
     url='',
     license='AGPL',
     author='Michal Zoubek',
