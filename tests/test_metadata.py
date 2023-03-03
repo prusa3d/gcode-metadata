@@ -5,7 +5,7 @@ import shutil
 import time
 import pytest
 
-from metadata import get_metadata, UnknownGcodeFileType, MetaData
+from gcode_metadata import get_metadata, UnknownGcodeFileType, MetaData
 
 gcodes_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                           "gcodes")
