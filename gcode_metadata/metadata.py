@@ -228,6 +228,12 @@ class FDMMetaData(MetaData):
         "temperature": int,
         "support_material": int,
         "ironing": int,
+        "quiet_percent_present": bool,
+        "quiet_left_present": bool,
+        "quiet_change_in_present": bool,
+        "normal_percent_present": bool,
+        "normal_left_present": bool,
+        "normal_change_in_present": bool,
     }
 
     KEY_VAL_PAT = re.compile("; (?P<key>.*?) = (?P<value>.*)$")
@@ -236,12 +242,34 @@ class FDMMetaData(MetaData):
         r"; thumbnail begin\s+(?P<dim>\w+) (?P<size>\d+)")
     THUMBNAIL_END_PAT = re.compile("; thumbnail end")
 
+    M73_PAT = re.compile(r"^[^;]*M73 ?"
+                         r"(?:Q(?P<quiet_percent>\d+))? ?"
+                         r"(?:S(?P<quiet_left>\d+))? ?"
+                         r"(?:C(?P<quiet_change_in>\d+))? ?"
+                         r"(?:P(?P<normal_percent>\d+))? ?"
+                         r"(?:R(?P<normal_left>\d+))? ?"
+                         r"(?:D(?P<normal_change_in>\d+))? ?.*"
+                         r"$")
+
+    # M73 info group and attribute names
+    M73_ATTRS = {"quiet_percent": "quiet_percent_present",
+                 "quiet_left": "quiet_left_present",
+                 "quiet_change_in": "quiet_change_in_present",
+                 "normal_percent": "normal_percent_present",
+                 "normal_left": "normal_left_present",
+                 "normal_change_in": "normal_change_in_present"}
+
     FDM_FILENAME_PAT = re.compile(
         r"^(?P<name>.*?)_(?P<height>[0-9.]+)mm_"
         r"(?P<material>\w+)_(?P<printer>\w+)_(?P<time>.*)\.")
 
     METADATA_START_OFFSET = 400000  # Read 400KB from the start
     METADATA_END_OFFSET = 40000  # Read 40KB at the end of the file
+    # Number of times the search for M73 is going to repeat if info
+    # is incomplete
+    MAX_M73_SEARCH_BYTES = 100000
+
+    TOLERATED_COUNT = 2
 
     def __init__(self, path: str):
         super().__init__(path)
@@ -252,6 +280,8 @@ class FDMMetaData(MetaData):
         self.parsed_image_dimensions = None
         self.parsed_image_size = None
         self.parsed_image = None
+
+        self.m73_searched_bytes = 0
 
     def load_from_path(self, path):
         """Try to obtain any usable metadata from the path itself"""
@@ -298,6 +328,14 @@ class FDMMetaData(MetaData):
         if match:
             key, val = match.groups()
             self.set_attr(key, val)
+
+    def from_gcode_line(self, line):
+        """Parses data from a line in the gcode section"""
+        match = self.M73_PAT.match(line)
+        if match:
+            for group_name, attribute_name in self.M73_ATTRS.items():
+                if match.group(group_name) is not None:
+                    self.set_attr(attribute_name, True)
 
 
     def load_from_file(self, path):
@@ -371,6 +409,23 @@ class FDMMetaData(MetaData):
             position += len(line)
             if line.startswith(b";"):
                 self.from_comment_line(line.decode("UTF-8"))
+            else:
+                if self.percent_of_m73_data() == 100:
+                    continue
+                if self.m73_searched_bytes > self.MAX_M73_SEARCH_BYTES:
+                    continue
+
+                self.from_gcode_line(line.decode("UTF-8"))
+                self.m73_searched_bytes += len(line)
+
+    def percent_of_m73_data(self):
+        """Report what percentage of M73 attributes has been found"""
+        count = len(self.M73_ATTRS)
+        present = 0
+        for attribute in self.M73_ATTRS.values():
+            if attribute in self.data:
+                present += 1
+        return (present/count) * 100
 
 class SLMetaData(MetaData):
     """Class that can extract available metadata and thumbnails from
