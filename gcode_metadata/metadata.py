@@ -1,6 +1,6 @@
 """Gcode-metadata tool for g-code files. Extracts preview pictures as well.
 """
-from time import time, sleep
+from time import time
 
 import base64
 import json
@@ -26,26 +26,10 @@ CHARS_TO_REMOVE = ["/", "\\", "\"", "(", ")", "[", "]", "'"]
 
 log = getLogger("connect-printer")
 
-TOLERATED_COUNT = 2
 RE_ESTIMATED = re.compile(r"((?P<days>[0-9]+)d\s*)?"
                           r"((?P<hours>[0-9]+)h\s*)?"
                           r"((?P<minutes>[0-9]+)m\s*)?"
                           r"((?P<seconds>[0-9]+)s)?")
-METADATA_MAX_OFFSET = 2000  # bytes from the start and end of a file
-METADATA_CHUNK_SIZE = 200
-COMMENT_BLOCK_MAX_SIZE = 1000000  # Max 1MB of comments
-
-
-def simplify(key):
-    """Remove specific characters from input
-    Used to try and match the gcode attribute names to ones in here"""
-    key = key.strip()
-    for char in key:
-        if char == " ":
-            key = key.replace(char, "_")
-        elif char in CHARS_TO_REMOVE:
-            key = key.replace(char, "")
-    return key
 
 
 class UnknownGcodeFileType(ValueError):
@@ -101,19 +85,6 @@ def estimated_to_seconds(value: str):
     retval += int(values['seconds'] or 0)
 
     return retval or None
-
-
-class ParsedData:
-    """Container for state sharing between FDM parsing methods"""
-
-    # pylint: disable=too-few-public-methods
-
-    def __init__(self):
-        self.image_data = None
-        self.dimension = ""
-        self.size = None
-        self.meta = {}
-        self.thumbnail = []
 
 
 class MetaData:
@@ -210,12 +181,23 @@ class MetaData:
         match `self.Attr` in `self.data`.
         """
         for attr, conv in self.Attrs.items():
-            val = data.get(attr) or data.get(simplify(attr))
-            if val:
-                try:
-                    self.data[attr] = conv(val)
-                except ValueError:
-                    log.warning("Could not convert using %s: %s", conv, val)
+            val = data.get(attr)
+            if not val:
+                continue
+            try:
+                self.data[attr] = conv(val)
+            except ValueError:
+                log.warning("Could not convert using %s: %s", conv, val)
+
+    def set_attr(self, name, value):
+        """A helper function that saves attributes to `self.data`"""
+        if name not in self.Attrs:
+            return
+        conv = self.Attrs[name]
+        try:
+            self.data[name] = conv(value)
+        except ValueError:
+            log.warning("Could not convert using %s: %s", conv, value)
 
     def __repr__(self):
         return f"Metadata: {self.path}, {len(self.data)} items, " \
@@ -255,12 +237,21 @@ class FDMMetaData(MetaData):
     THUMBNAIL_END_PAT = re.compile("; thumbnail end")
 
     FDM_FILENAME_PAT = re.compile(
-        r"^(?P<name>.*?)_(?P<height>[0-9\.]+)mm_"
+        r"^(?P<name>.*?)_(?P<height>[0-9.]+)mm_"
         r"(?P<material>\w+)_(?P<printer>\w+)_(?P<time>.*)\.")
+
+    METADATA_START_OFFSET = 400000  # Read 400KB from the start
+    METADATA_END_OFFSET = 40000  # Read 40KB at the end of the file
 
     def __init__(self, path: str):
         super().__init__(path)
         self.last_filename = None
+
+        # When in the process of parsing an image, these won't be None
+        # Parsed as in currently being parsed
+        self.parsed_image_dimensions = None
+        self.parsed_image_size = None
+        self.parsed_image = None
 
     def load_from_path(self, path):
         """Try to obtain any usable metadata from the path itself"""
@@ -276,68 +267,38 @@ class FDMMetaData(MetaData):
             }
             self.set_data(data)
 
-    @staticmethod
-    def reverse_readline(file_descriptor, buf_size=8192):
-        """
-        A generator that returns the lines of a file in reverse order
-        """
-        segment = None
-        remaining_size = file_descriptor.tell()
-        while remaining_size > 0:
-            offset = min(remaining_size, buf_size)
-            seek_to = remaining_size - offset
-            remaining_size = file_descriptor.seek(seek_to)
-            buffer = file_descriptor.read(offset)
-            lines = buffer.split(b'\n')
-            # The first line of the buffer is probably not a complete line, so
-            # we'll save it and append it to the last line of the next buffer
-            # we read
-            if segment is not None:
-                # If the previous chunk starts right from the beginning of
-                # line do not concat the segment to the last line of new
-                # chunk. Instead, yield the segment first
-                if buffer[-1] != b'\n':
-                    lines[-1] += segment
-                else:
-                    yield segment
-            segment = lines[0]
-            for line in reversed(lines[1:]):
-                yield line
-        # Don't yield None if the file was empty
-        if segment is not None:
-            yield segment
-
-    def from_line(self, data: ParsedData, line):
-        """
-        Parses data out of a given line
-        data variable is used to store all temporary data
-        """
+    def from_comment_line(self, line):
+        """Parses data from a line in the comments"""
         # thumbnail handling
         match = self.THUMBNAIL_BEGIN_PAT.match(line)
         if match:
-            data.dimension = match.group("dim")
-            data.size = int(match.group("size"))
-            data.thumbnail = []
+            self.parsed_image_dimensions = match.group("dim")
+            self.parsed_image_size = int(match.group("size"))
+            self.parsed_image = []
             return
 
         match = self.THUMBNAIL_END_PAT.match(line)
         if match:
-            data.image_data = "".join(data.thumbnail)
-            self.thumbnails[data.dimension] = data.image_data.encode()
-            assert len(data.image_data) == data.size, len(data.image_data)
-            data.thumbnail = []
-            data.dimension = ""
-            return
-        # We store the image dimensions only during parsing
-        # If actively parsing:
-        if data.dimension:
-            line = line[2:].strip()
-            data.thumbnail.append(line)
+            image_data = "".join(self.parsed_image)
+            self.thumbnails[self.parsed_image_dimensions] = image_data.encode()
+            assert len(image_data) == self.parsed_image_size, len(image_data)
 
+            self.parsed_image_dimensions = None
+            self.parsed_image_size = None
+            self.parsed_image = None
+            return
+
+        # We store the image data only during parsing. If actively parsing:
+        if self.parsed_image is not None:
+            line = line[2:].strip()
+            self.parsed_image.append(line)
+
+        # For the bulk of metadata comments
         match = self.KEY_VAL_PAT.match(line)
         if match:
             key, val = match.groups()
-            data.meta[key] = val
+            self.set_attr(key, val)
+
 
     def load_from_file(self, path):
         """Load metadata from file
@@ -349,30 +310,23 @@ class FDMMetaData(MetaData):
         # pylint: disable=redefined-outer-name
         # pylint: disable=invalid-name
         started_at = time()
-        data = ParsedData()
 
-        retries = 2
-        while retries:
-            with open(path, "rb") as file_descriptor:
-                self.quick_parse(data, file_descriptor)
-                parsing_new_file = self.last_filename != file_descriptor.name
-                to_log = retries == 1 and parsing_new_file
-                if self.evaluate_quick_parse(data, to_log):
-                    break
-                retries -= 1
-                sleep(0.2)
+        with open(path, "rb") as file_descriptor:
+            self.quick_parse(file_descriptor)
+            # parsing_new_file = self.last_filename != file_descriptor.name
+            # self.evaluate_quick_parse(data, to_log=parsing_new_file):
 
-        self.last_filename = file_descriptor.name
+        #self.last_filename = file_descriptor.name
 
-        self.set_data(data.meta)
+        #self.set_data(data.meta)
         log.debug("Caching took %s", time() - started_at)
 
-    def evaluate_quick_parse(self, data: ParsedData, to_log=False):
+    def evaluate_quick_parse(self, to_log=False):
         """Evaluates if the parsed data is sufficient
         Can log the result
         Returns True if the data is sufficient"""
         wanted = set(self.Attrs.keys())
-        got = set(data.meta.keys())
+        got = set(self.data.keys())
         missed = wanted - got
         log.debug("Wanted: %s", wanted)
         log.debug("Parsed: %s", got)
@@ -383,7 +337,7 @@ class FDMMetaData(MetaData):
 
         # --- Was parsing successful? ---
 
-        if len(data.meta) < 10:
+        if len(self.data) < 10:
             log.warning("Not enough info found, file not uploaded yet?")
             return False
 
@@ -392,77 +346,31 @@ class FDMMetaData(MetaData):
                 log.warning("No metadata parsed!")
             else:
                 log.warning("Metadata missing %s", missed)
-            if len(missed) <= TOLERATED_COUNT:
+            if len(missed) <= self.TOLERATED_COUNT:
                 log.warning("Missing meta tolerated, missing count < %s",
-                            TOLERATED_COUNT)
+                            self.TOLERATED_COUNT)
 
-        if len(missed) > TOLERATED_COUNT:
+        if len(missed) > self.TOLERATED_COUNT:
             return False
 
         return True
 
-    def parse_comment_block(self, data: ParsedData, file_descriptor):
-        """Parses consecutive lines until one doesn't start with a semicolon
-        returns how many bytes it parsed
-        """
-        bytes_parsed = 0
-        for line in file_descriptor:
-            if not line.strip():
-                bytes_parsed += 1
-                continue
-            if not line.startswith(b";"):
-                break
-            # Do not read more than a xK of comments
-            if bytes_parsed > COMMENT_BLOCK_MAX_SIZE:
-                break
-            bytes_parsed += len(line) + 1
-            self.from_line(data, line.decode("UTF-8"))
-        return bytes_parsed
-
-    def find_block_start(self, file_descriptor):
-        """Given a file descriptor at a position in a gcode file,
-        gets the position of the first comment line in its block"""
-        reverse_generator = self.reverse_readline(file_descriptor)
-        position = file_descriptor.tell()
-        block_start = position
-        for line in reverse_generator:
-            if not line.strip():
-                block_start -= 1
-                continue
-            if not line.startswith(b";"):
-                break
-            # Stop if there are too many comments
-            if position - block_start > COMMENT_BLOCK_MAX_SIZE:
-                break
-            # +1 for the newline which is not included
-            block_start -= len(line) + 1
-        reverse_generator.close()
-        return block_start
-
-    def quick_parse(self, data: ParsedData, file_descriptor):
+    def quick_parse(self, file_descriptor):
         """Parse metadata on the start and end of the file"""
-        # pylint: disable=too-many-branches
-        position = self.parse_comment_block(data, file_descriptor)
+        position = 0
         size = file_descriptor.seek(0, os.SEEK_END)
-        file_descriptor.seek(position)
+        file_descriptor.seek(0)
         while position != size:
-            if METADATA_MAX_OFFSET < position < size - METADATA_MAX_OFFSET:
+            close_to_start = position < self.METADATA_START_OFFSET
+            close_to_end = position > size - self.METADATA_END_OFFSET
+            if not close_to_start and not close_to_end:
                 # Skip the middle part of the file
-                position = size - METADATA_MAX_OFFSET
-            file_descriptor.seek(position)
-            chunk = file_descriptor.read(METADATA_CHUNK_SIZE)
-            if b"\n;" in chunk:
-                relative_semicolon_index = chunk.index(b"\n;")
-                semicolon_position = position + relative_semicolon_index
-                file_descriptor.seek(semicolon_position)
-                block_start = self.find_block_start(file_descriptor)
-                file_descriptor.seek(block_start)
-                parsed_bytes = self.parse_comment_block(data, file_descriptor)
-                position = block_start + parsed_bytes
-            else:
-                offset = min(METADATA_CHUNK_SIZE, size - position)
-                position = file_descriptor.seek(position + offset)
-
+                position = size - self.METADATA_END_OFFSET
+                file_descriptor.seek(position)
+            line = file_descriptor.readline()
+            position += len(line)
+            if line.startswith(b";"):
+                self.from_comment_line(line.decode("UTF-8"))
 
 class SLMetaData(MetaData):
     """Class that can extract available metadata and thumbnails from
