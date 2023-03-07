@@ -142,3 +142,35 @@ class TestFDNMetaData:
         assert not meta.data
         assert not meta.thumbnails
         assert meta.path == fn
+
+
+class TestSLMetaData:
+    def test_sl(self):
+        fn = os.path.join(gcodes_dir, "pentagonal-hexecontahedron-1.sl1")
+        meta = get_metadata(fn, False)
+
+        assert meta.data == {
+            'printer_model': 'SL1',
+            'printTime': 8720,
+            'faded_layers': 10,
+            'exposure_time': 7.5,
+            'initial_exposure_time': 35.0,
+            'max_initial_exposure_time': 300.0,
+            'max_exposure_time': 120.0,
+            'min_initial_exposure_time': 1.0,
+            'min_exposure_time': 1.0,
+            'layer_height': 0.05,
+            'materialName': 'Prusa Orange Tough @0.05',
+            'fileCreationTimestamp': '2020-09-17 at 13:53:21 UTC'
+        }
+
+        assert len(meta.thumbnails["400x400"]) == 19688
+        assert len(meta.thumbnails["800x480"]) == 64524
+
+    def test_sl_empty_file(self):
+        """Test a file that is empty"""
+        fn = os.path.join(gcodes_dir, "empty.sl1")
+        meta = get_metadata(fn, False)
+
+        assert not meta.data
+        assert not meta.thumbnails
