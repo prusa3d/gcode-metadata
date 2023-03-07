@@ -118,9 +118,36 @@ class TestFDNMetaData:
             'layer_height': 0.15,
             'support_material': 0,
             'temperature': 250,
-            'ironing': 0
+            'ironing': 0,
+            'layer_info_present': True,
+            'normal_left_present': True,
+            'normal_percent_present': True,
+            'quiet_left_present': True,
+            'quiet_percent_present': True,
         }
         assert len(meta.thumbnails['640x480']) == 158644
+
+    def test_m73_and_layer_info(self):
+        """Tests an updated file with additional suppported info"""
+        fn = os.path.join(gcodes_dir,
+                          "full_m73_layers_0.2mm_PLA_MK3SMMU2S_11m.gcode")
+        meta = get_metadata(fn, False)
+        assert meta.data == {
+            'estimated printing time (normal mode)': '10m 32s',
+            'filament_type': 'PLA;PLA;PLA;PLA;PLA',
+            'printer_model': 'MK3SMMU2S',
+            'layer_height': 0.2,
+            'normal_percent_present': True,
+            'normal_left_present': True,
+            'quiet_percent_present': True,
+            'quiet_left_present': True,
+            'layer_info_present': True,
+            'brim_width': 0,
+            'fill_density': '15%',
+            'ironing': 0,
+            'support_material': 0
+        }
+        assert len(meta.thumbnails['160x120']) == 5616
 
     def test_only_path(self):
         """Only the filename contains metadata. There are no thumbnails."""
@@ -142,3 +169,35 @@ class TestFDNMetaData:
         assert not meta.data
         assert not meta.thumbnails
         assert meta.path == fn
+
+
+class TestSLMetaData:
+    def test_sl(self):
+        fn = os.path.join(gcodes_dir, "pentagonal-hexecontahedron-1.sl1")
+        meta = get_metadata(fn, False)
+
+        assert meta.data == {
+            'printer_model': 'SL1',
+            'printTime': 8720,
+            'faded_layers': 10,
+            'exposure_time': 7.5,
+            'initial_exposure_time': 35.0,
+            'max_initial_exposure_time': 300.0,
+            'max_exposure_time': 120.0,
+            'min_initial_exposure_time': 1.0,
+            'min_exposure_time': 1.0,
+            'layer_height': 0.05,
+            'materialName': 'Prusa Orange Tough @0.05',
+            'fileCreationTimestamp': '2020-09-17 at 13:53:21 UTC'
+        }
+
+        assert len(meta.thumbnails["400x400"]) == 19688
+        assert len(meta.thumbnails["800x480"]) == 64524
+
+    def test_sl_empty_file(self):
+        """Test a file that is empty"""
+        fn = os.path.join(gcodes_dir, "empty.sl1")
+        meta = get_metadata(fn, False)
+
+        assert not meta.data
+        assert not meta.thumbnails
