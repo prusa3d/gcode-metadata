@@ -234,6 +234,7 @@ class FDMMetaData(MetaData):
         "normal_percent_present": bool,
         "normal_left_present": bool,
         "normal_change_in_present": bool,
+        "layer_info_present": bool
     }
 
     KEY_VAL_PAT = re.compile("; (?P<key>.*?) = (?P<value>.*)$")
@@ -250,6 +251,8 @@ class FDMMetaData(MetaData):
                          r"(?:R(?P<normal_left>\d+))? ?"
                          r"(?:D(?P<normal_change_in>\d+))? ?.*"
                          r"$")
+
+    LAYER_CHANGE_PAT = re.compile(r"^;Z:\d+\.\d+$")
 
     # M73 info group and attribute names
     M73_ATTRS = {"quiet_percent": "quiet_percent_present",
@@ -328,6 +331,10 @@ class FDMMetaData(MetaData):
         if match:
             key, val = match.groups()
             self.set_attr(key, val)
+
+        match = self.LAYER_CHANGE_PAT.match(line)
+        if match:
+            self.set_attr("layer_info_present", True)
 
     def from_gcode_line(self, line):
         """Parses data from a line in the gcode section"""
