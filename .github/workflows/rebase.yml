@@ -1,0 +1,2 @@
+- name: Rebase Pull Requests
+  uses: linhbn123/rebase-pull-requests@v1.0.1
