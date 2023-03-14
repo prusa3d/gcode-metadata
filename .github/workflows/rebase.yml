@@ -1,12 +1,26 @@
 name: Rebase Pull Requests
 on:
-  push:
-    branches: '**'
+  issue_comment:
+    types: [created]
 jobs:
   rebase:
+    name: Rebase
     runs-on: ubuntu-latest
+    if: >-
+      github.event.issue.pull_request != '' && 
+      (
+        contains(github.event.comment.body, '/rebase') || 
+        contains(github.event.comment.body, '/autosquash')
+      )
     steps:
-    - name: Automatic Rebase
-      # You may pin to the exact commit or the version.
-      # uses: cirrus-actions/rebase@cf2ad5908b365d40882ef06dab959717ec1aaf71
-      uses: cirrus-actions/rebase@1.2
+      - name: Checkout the latest code
+        uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0 # otherwise, you will fail to push refs to dest repo
+      - name: Automatic Rebase
+        uses: cirrus-actions/rebase@1.7
+        with:
+          autosquash: ${{ contains(github.event.comment.body, '/autosquash') || contains(github.event.comment.body, '/rebase-autosquash') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
