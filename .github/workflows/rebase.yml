@@ -6,5 +6,7 @@ jobs:
   rebase:
     runs-on: ubuntu-latest
     steps:
-    - name: Rebase Pull Requests
-      uses: linhbn123/rebase-pull-requests@v1.0.1
+    - name: Automatic Rebase
+      # You may pin to the exact commit or the version.
+      # uses: cirrus-actions/rebase@cf2ad5908b365d40882ef06dab959717ec1aaf71
+      uses: cirrus-actions/rebase@1.2
