@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gcode-metadata"
+version = "0.1.0"
+authors = [
+  { name="Michal Zoubek", email="link@prusa3d.com" },
+]
+description = "Python library for extraction of metadata from g-code files"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU Lesser General Public License v2 (LGPLv2)",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/prusa3d/gcode-metadata"
+"Bug Tracker" = "https://github.com/prusa3d/gcode-metadata/issues"
