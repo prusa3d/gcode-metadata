@@ -206,18 +206,21 @@ class MetaData:
 
     __str__ = __repr__
 
+
 class MMUBehavior:
     """A class to house the single tool compatibility getter function"""
+    # pylint: disable=too-few-public-methods
 
     @staticmethod
     @abc.abstractmethod
     def get_single_value(value_list):
         """Describes how to get a single tool compatibility value
         from a list"""
-        ...
+
 
 class SameOrNothing(MMUBehavior):
     """A class that houses the same of nothing getter"""
+    # pylint: disable=too-few-public-methods
 
     @staticmethod
     def get_single_value(value_list):
@@ -226,21 +229,25 @@ class SameOrNothing(MMUBehavior):
             raise ValueError("The values were not the same")
         return value_list[0]
 
+
 class Sum(MMUBehavior):
     """A class that houses the Sum getter"""
+    # pylint: disable=too-few-public-methods
 
     @staticmethod
     def get_single_value(value_list):
         """Adds the value of items in the list"""
         return sum(value_list)
 
+
 class MMUAttribute:
     """A class describing how to parse an attribute that can have
-    multiple values for an mmu print"""
+    multiple values for a mmu print"""
+    # pylint: disable=too-few-public-methods
 
     def __init__(self,
-                 separator: str=", ",
-                 value_type: Type=float,
+                 separator: str = ", ",
+                 value_type: Type = float,
                  behavior: Type[MMUBehavior] = SameOrNothing):
         self.separator: str = separator
         self.value_type = value_type
@@ -321,8 +328,9 @@ class FDMMetaData(MetaData):
         "normal_change_in_present": bool,
         "layer_info_present": bool
     }
-    
+
     # Add attributes that have multiple values in MMU print gcodes
+    # pylint: disable=no-value-for-parameter
     for name, mmu_attribute in MMUAttrs.items():
         mmu_name = get_mmu_name(name)
         Attrs[name] = mmu_attribute.value_type
@@ -435,7 +443,6 @@ class FDMMetaData(MetaData):
                 if match.group(group_name) is not None:
                     self.set_attr(attribute_name, True)
 
-
     def load_from_file(self, path):
         """Load metadata from file
         Tries to use the quick_parse function. If it keeps failing,
@@ -452,9 +459,8 @@ class FDMMetaData(MetaData):
             # parsing_new_file = self.last_filename != file_descriptor.name
             # self.evaluate_quick_parse(data, to_log=parsing_new_file):
 
-        #self.last_filename = file_descriptor.name
-
-        #self.set_data(data.meta)
+        # self.last_filename = file_descriptor.name
+        # self.set_data(data.meta)
         log.debug("Caching took %s", time() - started_at)
 
     def evaluate_quick_parse(self, to_log=False):
@@ -524,6 +530,7 @@ class FDMMetaData(MetaData):
             if attribute in self.data:
                 present += 1
         return (present/count) * 100
+
 
 class SLMetaData(MetaData):
     """Class that can extract available metadata and thumbnails from
