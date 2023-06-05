@@ -1,6 +1,5 @@
 """Gcode-metadata tool for g-code files. Extracts preview pictures as well.
 """
-import abc
 from time import time
 
 import base64
@@ -8,7 +7,7 @@ import json
 import re
 import os
 import zipfile
-from typing import Dict, Any, Type
+from typing import Dict, Any, Type, Callable, List
 from logging import getLogger
 
 __version__ = "0.1.0"
@@ -36,6 +35,11 @@ RE_ESTIMATED = re.compile(r"((?P<days>[0-9]+)d\s*)?"
 class UnknownGcodeFileType(ValueError):
     # pylint: disable=missing-class-docstring
     ...
+
+
+def get_mmu_name(name):
+    """Returns a name for the new list value item"""
+    return f"{name} per tool"
 
 
 def check_gcode_completion(path):
@@ -86,6 +90,13 @@ def estimated_to_seconds(value: str):
     retval += int(values['seconds'] or 0)
 
     return retval or None
+
+
+def same_or_nothing(value_list):
+    """Returns a value only if all the values in a list are the same"""
+    if any(x != value_list[0] for x in value_list):
+        raise ValueError("The values were not the same")
+    return value_list[0]
 
 
 class MetaData:
@@ -207,51 +218,22 @@ class MetaData:
     __str__ = __repr__
 
 
-class MMUBehavior:
-    """A class to house the single tool compatibility getter function"""
-    # pylint: disable=too-few-public-methods
-
-    @staticmethod
-    @abc.abstractmethod
-    def get_single_value(value_list):
-        """Describes how to get a single tool compatibility value
-        from a list"""
-
-
-class SameOrNothing(MMUBehavior):
-    """A class that houses the same of nothing getter"""
-    # pylint: disable=too-few-public-methods
-
-    @staticmethod
-    def get_single_value(value_list):
-        """Returns a value only if all the values in a list are the same"""
-        if any(x != value_list[0] for x in value_list):
-            raise ValueError("The values were not the same")
-        return value_list[0]
-
-
-class Sum(MMUBehavior):
-    """A class that houses the Sum getter"""
-    # pylint: disable=too-few-public-methods
-
-    @staticmethod
-    def get_single_value(value_list):
-        """Adds the value of items in the list"""
-        return sum(value_list)
-
-
 class MMUAttribute:
     """A class describing how to parse an attribute that can have
-    multiple values for a mmu print"""
+    multiple values for an mmu print
+
+    conversion: a function that takes a list of values and returns a single
+                one. ValueError is raised if that cannot be done"""
+
     # pylint: disable=too-few-public-methods
 
     def __init__(self,
-                 separator: str = ", ",
-                 value_type: Type = float,
-                 behavior: Type[MMUBehavior] = SameOrNothing):
+                 separator: str=", ",
+                 value_type: Type=float,
+                 conversion: Callable[[List[Any]], Any] = same_or_nothing):
         self.separator: str = separator
         self.value_type = value_type
-        self.behavior: Type[MMUBehavior] = behavior
+        self.conversion: Callable[[List[Any]], Any] = conversion
 
     def from_string(self, raw_value):
         """Parses the value from string, returns the list value as well as a
@@ -259,23 +241,18 @@ class MMUAttribute:
         parsed = []
         for value in raw_value.split(self.separator):
             parsed.append(self.value_type(value))
-        single_value = self.behavior.get_single_value(parsed)
+        single_value = self.conversion(parsed)
         return parsed, single_value
 
 
 class FDMMetaData(MetaData):
     """Class for extracting Metadata for FDM gcodes"""
 
-    @staticmethod
-    def get_mmu_name(name):
-        """Returns a name for the new list value item"""
-        return f"{name} per tool"
-
     def set_attr(self, name, value):
         """Set an attribute, but add support for mmu list attributes"""
         if name in self.MMUAttrs:
             value_list, single_value = self.MMUAttrs[name].from_string(value)
-            mmu_name = self.get_mmu_name(name)
+            mmu_name = get_mmu_name(name)
             super().set_attr(mmu_name, value_list)
             super().set_attr(name, single_value)
         else:
@@ -285,28 +262,28 @@ class FDMMetaData(MetaData):
 
     MMUAttrs: Dict[str, MMUAttribute] = {
         "filament used [cm3]": MMUAttribute(
-            separator=", ", value_type=float, behavior=Sum
+            separator=", ", value_type=float, conversion=sum
         ),
         "filament used [mm]": MMUAttribute(
-            separator=", ", value_type=float, behavior=Sum
+            separator=", ", value_type=float, conversion=sum
         ),
         "filament used [g]": MMUAttribute(
-            separator=", ", value_type=float, behavior=Sum
+            separator=", ", value_type=float, conversion=sum
         ),
         "filament cost": MMUAttribute(
-            separator=", ", value_type=float, behavior=Sum
+            separator=", ", value_type=float, conversion=sum
         ),
         "filament_type": MMUAttribute(
-            separator=";", value_type=str, behavior=SameOrNothing
+            separator=";", value_type=str, conversion=same_or_nothing
         ),
         "temperature": MMUAttribute(
-            separator=",", value_type=int, behavior=SameOrNothing
+            separator=",", value_type=int, conversion=same_or_nothing
         ),
         "bed_temperature": MMUAttribute(
-            separator=",", value_type=int, behavior=SameOrNothing
+            separator=",", value_type=int, conversion=same_or_nothing
         ),
         "nozzle_diameter": MMUAttribute(
-            separator=",", value_type=float, behavior=SameOrNothing
+            separator=",", value_type=float, conversion=same_or_nothing
         )
     }
 
