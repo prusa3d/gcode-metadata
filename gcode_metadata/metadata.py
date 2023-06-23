@@ -593,14 +593,19 @@ class SLMetaData(MetaData):
         return thumbnails
 
 
-def get_metadata(path: str, save_cache=True):
+def get_metadata(path: str, save_cache=True, filename=None):
     """Returns the Metadata for given `path`
 
     :param path: Gcode file
     :param save_cache: Boolean if cache should be saved
+    :filename: Filename in case of temp file
     """
     # pylint: disable=redefined-outer-name
-    fnl = path.lower()
+    if filename:
+        fnl = filename.lower()
+    else:
+        fnl = path.lower()
+
     metadata: MetaData
     if fnl.lower().endswith(GCODE_EXTENSIONS):
         metadata = FDMMetaData(path)
