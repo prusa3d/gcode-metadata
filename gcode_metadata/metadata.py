@@ -618,6 +618,33 @@ def get_metadata(path: str, save_cache=True, filename=None):
     return metadata
 
 
+def biggest_resolution(thumbnails: Dict[str, bytes]):
+    """Get the thumbnail with the biggest resolution from the list of
+    thumbnails
+
+    >>> biggest_resolution({'8000x200': b'', '600x400': b'', '800x600': b''})
+    '800x600'
+    >>> biggest_resolution({'600x1': b'', '320x240': b'', '800x9000': b''})
+    '320x240'
+    >>> biggest_resolution({'500x100': b'', '50x50': b'', '900x400': b''})
+    '50x50'
+    """
+    max_resolution_key = None
+    max_res = 0
+
+    for resolution in thumbnails:
+        width, height = map(int, resolution.split('x'))
+
+        # Calculate ratio and consider only values in between 1 and 2
+        ratio = width / height
+        res = width * height
+
+        if 1 <= ratio <= 2 and res > max_res:
+            max_res = res
+            max_resolution_key = resolution
+    return max_resolution_key
+
+
 if __name__ == "__main__":
     import argparse
 
