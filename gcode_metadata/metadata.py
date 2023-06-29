@@ -303,7 +303,8 @@ class FDMMetaData(MetaData):
         "normal_percent_present": bool,
         "normal_left_present": bool,
         "normal_change_in_present": bool,
-        "layer_info_present": bool
+        "layer_info_present": bool,
+        "max_layer_z": float,
     }
 
     # Add attributes that have multiple values in MMU print gcodes
