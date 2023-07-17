@@ -240,8 +240,14 @@ class MMUAttribute:
         value for a single tool info compatibility"""
         parsed = []
         for value in raw_value.split(self.separator):
-            parsed.append(self.value_type(value))
-        single_value = self.conversion(parsed)
+            try:
+                parsed.append(self.value_type(value))
+            except ValueError:
+                return None, None
+        try:
+            single_value = self.conversion(parsed)
+        except ValueError:
+            single_value = None
         return parsed, single_value
 
 
@@ -253,8 +259,10 @@ class FDMMetaData(MetaData):
         if name in self.MMUAttrs:
             value_list, single_value = self.MMUAttrs[name].from_string(value)
             mmu_name = get_mmu_name(name)
-            super().set_attr(mmu_name, value_list)
-            super().set_attr(name, single_value)
+            if value_list is not None:
+                super().set_attr(mmu_name, value_list)
+            if single_value is not None:
+                super().set_attr(name, single_value)
         else:
             super().set_attr(name, value)
 
