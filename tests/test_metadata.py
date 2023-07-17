@@ -170,6 +170,22 @@ class TestFDNMetaData:
         assert not meta.thumbnails
         assert meta.path == fn
 
+    def test_mmu(self):
+        """test that mmu attributes are parsed correctly"""
+        fn = os.path.join(gcodes_dir, "mmu_attribute_test.gcode")
+        meta = get_metadata(fn, False)
+        assert meta.data['filament used [mm]'] == 6
+        assert round(meta.data['filament used [g]'], 2) == 42.69
+        assert meta.data['bed_temperature'] == 110
+        # This might be wrong, we might want to not allow negative values,
+        # but it's fun, so whatever
+        assert meta.data['filament cost'] == 0
+        assert 'filament used [cm3]' not in meta.data
+        assert 'filament_type' not in meta.data
+        assert 'nozzle_diameter' not in meta.data
+        assert 'temperature' not in meta.data
+
+
 
 class TestSLMetaData:
     def test_sl(self):
