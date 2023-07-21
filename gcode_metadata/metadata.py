@@ -325,8 +325,9 @@ class FDMMetaData(MetaData):
     KEY_VAL_PAT = re.compile("; (?P<key>.*?) = (?P<value>.*)$")
 
     THUMBNAIL_BEGIN_PAT = re.compile(
-        r"; thumbnail begin\s+(?P<dim>\w+) (?P<size>\d+)")
-    THUMBNAIL_END_PAT = re.compile("; thumbnail end")
+        r"; thumbnail_?(?P<format>QOI|JPG|) begin (?P<dim>[\w ]+) "
+        r"(?P<size>\d+)")
+    THUMBNAIL_END_PAT = re.compile("; thumbnail_?(QOI|JPG)? end")
 
     M73_PAT = re.compile(r"^[^;]*M73 ?"
                          r"(?:Q(?P<quiet_percent>\d+))? ?"
@@ -607,7 +608,7 @@ def get_metadata(path: str, save_cache=True, filename=None):
 
     :param path: Gcode file
     :param save_cache: Boolean if cache should be saved
-    :filename: Filename in case of temp file
+    :param filename: Filename in case of temp file
     """
     # pylint: disable=redefined-outer-name
     if filename:
@@ -637,6 +638,8 @@ def biggest_resolution(thumbnails: Dict[str, bytes]):
     '320x240'
     >>> biggest_resolution({'500x100': b'', '50x50': b'', '900x400': b''})
     '50x50'
+    >>> biggest_resolution({'500x200': b''})
+    '500x200'
     """
     max_resolution_key = None
     max_res = 0
@@ -647,10 +650,18 @@ def biggest_resolution(thumbnails: Dict[str, bytes]):
         # Calculate ratio and consider only values in between 1 and 2
         ratio = width / height
         res = width * height
+        if 1 <= ratio <= 2:
+            if res > max_res:
+                max_res = res
+                max_resolution_key = resolution
+        else:
+            log.info("Thumbnail ratio is not between 1 and 2: %s", ratio)
 
-        if 1 <= ratio <= 2 and res > max_res:
-            max_res = res
-            max_resolution_key = resolution
+    if max_resolution_key is None:
+        log.info("No thumbnail with ratio between 1 and 2 found. "
+                 "Using biggest thumbnail.")
+        max_resolution_key = max(thumbnails.keys())
+
     return max_resolution_key
 
 
