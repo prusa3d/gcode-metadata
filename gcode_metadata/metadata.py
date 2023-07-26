@@ -228,8 +228,8 @@ class MMUAttribute:
     # pylint: disable=too-few-public-methods
 
     def __init__(self,
-                 separator: str=", ",
-                 value_type: Type=float,
+                 separator: str = ", ",
+                 value_type: Type = float,
                  conversion: Callable[[List[Any]], Any] = same_or_nothing):
         self.separator: str = separator
         self.value_type = value_type
@@ -268,32 +268,41 @@ class FDMMetaData(MetaData):
 
     # Metadata we are looking for and respective conversion functions
 
-    MMUAttrs: Dict[str, MMUAttribute] = {
-        "filament used [cm3]": MMUAttribute(
-            separator=", ", value_type=float, conversion=sum
-        ),
-        "filament used [mm]": MMUAttribute(
-            separator=", ", value_type=float, conversion=sum
-        ),
-        "filament used [g]": MMUAttribute(
-            separator=", ", value_type=float, conversion=sum
-        ),
-        "filament cost": MMUAttribute(
-            separator=", ", value_type=float, conversion=sum
-        ),
-        "filament_type": MMUAttribute(
-            separator=";", value_type=str, conversion=same_or_nothing
-        ),
-        "temperature": MMUAttribute(
-            separator=",", value_type=int, conversion=same_or_nothing
-        ),
-        "bed_temperature": MMUAttribute(
-            separator=",", value_type=int, conversion=same_or_nothing
-        ),
-        "nozzle_diameter": MMUAttribute(
-            separator=",", value_type=float, conversion=same_or_nothing
-        )
-    }
+    MMUAttrs: Dict[str,
+                   MMUAttribute] = {
+                       "filament used [cm3]":
+                       MMUAttribute(separator=", ",
+                                    value_type=float,
+                                    conversion=sum),
+                       "filament used [mm]":
+                       MMUAttribute(separator=", ",
+                                    value_type=float,
+                                    conversion=sum),
+                       "filament used [g]":
+                       MMUAttribute(separator=", ",
+                                    value_type=float,
+                                    conversion=sum),
+                       "filament cost":
+                       MMUAttribute(separator=", ",
+                                    value_type=float,
+                                    conversion=sum),
+                       "filament_type":
+                       MMUAttribute(separator=";",
+                                    value_type=str,
+                                    conversion=same_or_nothing),
+                       "temperature":
+                       MMUAttribute(separator=",",
+                                    value_type=int,
+                                    conversion=same_or_nothing),
+                       "bed_temperature":
+                       MMUAttribute(separator=",",
+                                    value_type=int,
+                                    conversion=same_or_nothing),
+                       "nozzle_diameter":
+                       MMUAttribute(separator=",",
+                                    value_type=float,
+                                    conversion=same_or_nothing)
+                   }
 
     # These keys are primary defined by PrusaSlicer
     # Keys ending in "per tool" mean there is a list inside
@@ -341,12 +350,14 @@ class FDMMetaData(MetaData):
     LAYER_CHANGE_PAT = re.compile(r"^;Z:\d+\.\d+$")
 
     # M73 info group and attribute names
-    M73_ATTRS = {"quiet_percent": "quiet_percent_present",
-                 "quiet_left": "quiet_left_present",
-                 "quiet_change_in": "quiet_change_in_present",
-                 "normal_percent": "normal_percent_present",
-                 "normal_left": "normal_left_present",
-                 "normal_change_in": "normal_change_in_present"}
+    M73_ATTRS = {
+        "quiet_percent": "quiet_percent_present",
+        "quiet_left": "quiet_left_present",
+        "quiet_change_in": "quiet_change_in_present",
+        "normal_percent": "normal_percent_present",
+        "normal_left": "normal_left_present",
+        "normal_change_in": "normal_change_in_present"
+    }
 
     FDM_FILENAME_PAT = re.compile(
         r"^(?P<name>.*?)_(?P<height>[0-9.]+)mm_"
@@ -516,7 +527,7 @@ class FDMMetaData(MetaData):
         for attribute in self.M73_ATTRS.values():
             if attribute in self.data:
                 present += 1
-        return (present/count) * 100
+        return (present / count) * 100
 
 
 class SLMetaData(MetaData):
