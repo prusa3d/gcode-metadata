@@ -7,7 +7,7 @@ import json
 import re
 import os
 import zipfile
-from typing import Dict, Any, Type, Callable, List
+from typing import Dict, Any, Type, Callable, List, Optional
 from logging import getLogger
 
 __version__ = "0.1.0"
@@ -112,6 +112,8 @@ class MetaData:
         self.path = path
         self.thumbnails = {}
         self.data = {}
+        # buffer which keeps last unfinished line from previous chunk
+        self.chunk_buffer = b''
 
     @property
     def cache_name(self):
@@ -495,6 +497,18 @@ class FDMMetaData(MetaData):
 
         return True
 
+    def process_line(self, line: bytes):
+        """Try to read info from given byteaaray line"""
+        if line.startswith(b";"):
+            self.from_comment_line(line.decode("UTF-8"))
+        else:
+            if self.percent_of_m73_data() == 100:
+                return
+            if self.m73_searched_bytes > self.MAX_M73_SEARCH_BYTES:
+                return
+            self.from_gcode_line(line.decode("UTF-8"))
+            self.m73_searched_bytes += len(line)
+
     def quick_parse(self, file_descriptor):
         """Parse metadata on the start and end of the file"""
         position = 0
@@ -509,16 +523,21 @@ class FDMMetaData(MetaData):
                 file_descriptor.seek(position)
             line = file_descriptor.readline()
             position += len(line)
-            if line.startswith(b";"):
-                self.from_comment_line(line.decode("UTF-8"))
-            else:
-                if self.percent_of_m73_data() == 100:
-                    continue
-                if self.m73_searched_bytes > self.MAX_M73_SEARCH_BYTES:
-                    continue
+            self.process_line(line)
 
-                self.from_gcode_line(line.decode("UTF-8"))
-                self.m73_searched_bytes += len(line)
+    def load_from_chunk(self, data: bytes):
+        """Process given chunk array of data."""
+        data = self.chunk_buffer + data
+        lines = data.split(b"\n")
+        # last line was cut in middle, save it to buffer to process it
+        # with next chunk of data
+        if not lines[-1].endswith(b"\n"):
+            self.chunk_buffer = lines.pop()
+        else:
+            self.chunk_buffer = b''
+
+        for line in lines:
+            self.process_line(line)
 
     def percent_of_m73_data(self):
         """Report what percentage of M73 attributes has been found"""
@@ -619,24 +638,34 @@ def get_metadata(path: str, save_cache=True, filename=None):
 
     :param path: Gcode file
     :param save_cache: Boolean if cache should be saved
-    :param filename: Filename in case of temp file
+    :param filename: Filename in case of temp file as the path do differs from
+    the name of temp file and the meta class is decided based on extension.
     """
-    # pylint: disable=redefined-outer-name
+    metadata = get_meta_class(path, filename)
+    metadata.load(save_cache)
+    return metadata
+
+
+def get_meta_class(path: str, filename: Optional[str] = None):
+    """Returns the Metadata class based on given filename or path.
+
+    :param path: Gcode file
+    :param filename: Filename in case of temp file as the path do differs from
+    the name of temp file and the meta class is decided based on extension.
+    """
     if filename:
         fnl = filename.lower()
     else:
         fnl = path.lower()
 
-    metadata: MetaData
+    meta_class: MetaData
     if fnl.lower().endswith(GCODE_EXTENSIONS):
-        metadata = FDMMetaData(path)
+        meta_class = FDMMetaData(path)
     elif fnl.lower().endswith(".sl1"):
-        metadata = SLMetaData(path)
+        meta_class = SLMetaData(path)
     else:
         raise UnknownGcodeFileType(path)
-
-    metadata.load(save_cache)
-    return metadata
+    return meta_class
 
 
 def biggest_resolution(thumbnails: Dict[str, bytes]):

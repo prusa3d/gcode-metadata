@@ -5,7 +5,8 @@ import shutil
 import time
 import pytest
 
-from gcode_metadata import get_metadata, UnknownGcodeFileType, MetaData
+from gcode_metadata import (get_metadata, UnknownGcodeFileType, MetaData,
+                            get_meta_class)
 
 gcodes_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                           "gcodes")
@@ -103,6 +104,17 @@ def test_get_metadata_invalid_file():
 class TestFDNMetaData:
     """Tests for standard gcode metadata."""
 
+    def chunk_read_file(self, meta_class, filepath):
+        """Util method which reads the file in chunk and call load_from_chunk
+        on the blocks of data from given meta_class."""
+        chunk_size = 10 * 1024  # 10 KiB test on small chunks
+        with open(filepath, 'rb') as file:
+            while True:
+                chunk = file.read(chunk_size)
+                if not chunk:
+                    break
+                meta_class.load_from_chunk(chunk)
+
     def test_full(self):
         """Both the file and filename contain metadata. There are thumbnails.
         """
@@ -199,6 +211,46 @@ class TestFDNMetaData:
         assert 'filament_type' not in meta.data
         assert 'nozzle_diameter' not in meta.data
         assert 'temperature' not in meta.data
+
+    def test_from_chunks(self):
+        """Test chunks from file read ok"""
+        fname = os.path.join(gcodes_dir,
+                             "fdn_full_0.15mm_PETG_MK3S_2h6m.gcode")
+        chunk_meta = get_meta_class(fname)
+        self.chunk_read_file(chunk_meta, fname)
+        # check that same result came from parsing metadata as a whole file
+        meta = get_metadata(fname, False)
+        assert meta.thumbnails == chunk_meta.thumbnails
+        assert meta.data == chunk_meta.data
+
+    def test_from_chunks_meta_only_path(self):
+        """Test chunks from file with no metadata."""
+        fname = os.path.join(gcodes_dir,
+                             "fdn_only_filename_0.25mm_PETG_MK3S_2h9m.gcode")
+        chunk_meta = get_meta_class(fname)
+        self.chunk_read_file(chunk_meta, fname)
+        assert chunk_meta.data == {}
+        chunk_meta.load_from_path(fname)
+        assert chunk_meta.data == {
+            'estimated printing time (normal mode)': '2h9m',
+            'filament_type': 'PETG',
+            'printer_model': 'MK3S',
+            'layer_height': 0.25,
+        }
+        assert not chunk_meta.thumbnails
+
+    def test_from_chunks_empty_file(self):
+        """Test chunks from file with no metadata."""
+        fname = os.path.join(gcodes_dir, "fdn_all_empty.gcode")
+        chunk_meta = get_meta_class(fname)
+        self.chunk_read_file(chunk_meta, fname)
+        assert chunk_meta.data == {}
+
+    def test_from_chunks_invalid_file(self):
+        """Test reading metadata as chunks invalid file."""
+        fname = tempfile.mkstemp()[1]
+        with pytest.raises(UnknownGcodeFileType):
+            get_meta_class(fname)
 
 
 class TestSLMetaData:
