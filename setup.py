@@ -9,5 +9,4 @@ setup(
     author='Michal Zoubek',
     author_email='link@prusa3d.com',
     description='Python library for extraction of metadata from g-code files',
-    package_data={'gcode_metadata': ['py.typed']}
-)
+    package_data={'gcode_metadata': ['py.typed']})
