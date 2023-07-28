@@ -114,6 +114,7 @@ class MetaData:
         self.data = {}
         # buffer which keeps last unfinished line from previous chunk
         self.chunk_buffer = b''
+        self.position = 0  # current position in chunked read
 
     @property
     def cache_name(self):
@@ -510,15 +511,21 @@ class FDMMetaData(MetaData):
             self.from_gcode_line(line.decode("UTF-8"))
             self.m73_searched_bytes += len(line)
 
+    def metadata_area(self, position: int, size: int) -> bool:
+        """Finds out if the current position contains metadata"""
+        close_to_start = position < self.METADATA_START_OFFSET
+        close_to_end = position > size - self.METADATA_END_OFFSET
+        if not close_to_start and not close_to_end:
+            return False
+        return True
+
     def quick_parse(self, file_descriptor):
         """Parse metadata on the start and end of the file"""
         position = 0
         size = file_descriptor.seek(0, os.SEEK_END)
         file_descriptor.seek(0)
         while position != size:
-            close_to_start = position < self.METADATA_START_OFFSET
-            close_to_end = position > size - self.METADATA_END_OFFSET
-            if not close_to_start and not close_to_end:
+            if not self.metadata_area(position, size):
                 # Skip the middle part of the file
                 position = size - self.METADATA_END_OFFSET
                 file_descriptor.seek(position)
@@ -526,13 +533,24 @@ class FDMMetaData(MetaData):
             position += len(line)
             self.process_line(line)
 
-    def load_from_chunk(self, data: bytes):
-        """Process given chunk array of data."""
+    def load_from_chunk(self, data: bytes, size: int):
+        """Process given chunk array of data.
+        :data: data of a chunk.
+        :size: size of the file."""
+        metadata_area = self.metadata_area(self.position, size)
+        self.position += len(data)
+        if not metadata_area:
+            metadata_end_offset_position = size - self.METADATA_END_OFFSET
+            # end offset not in chunk data
+            if metadata_end_offset_position > self.position:
+                self.chunk_buffer = b''
+                return
+            data = data[:metadata_end_offset_position]
         data = self.chunk_buffer + data
         lines = data.split(b"\n")
         # last line was cut in middle, save it to buffer to process it
         # with next chunk of data
-        if not lines[-1].endswith(b"\n"):
+        if not data.endswith(b"\n"):
             self.chunk_buffer = lines.pop()
         else:
             self.chunk_buffer = b''
