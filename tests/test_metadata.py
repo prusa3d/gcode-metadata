@@ -104,16 +104,19 @@ def test_get_metadata_invalid_file():
 class TestFDNMetaData:
     """Tests for standard gcode metadata."""
 
-    def chunk_read_file(self, meta_class, filepath):
+    def chunk_read_file(self, meta_class, filepath, chunk_size=None):
         """Util method which reads the file in chunk and call load_from_chunk
         on the blocks of data from given meta_class."""
-        chunk_size = 10 * 1024  # 10 KiB test on small chunks
+        chunk_size = chunk_size or 10 * 1024  # 10 KiB test on small chunks
         with open(filepath, 'rb') as file:
+            # find out file size
+            file_size = file.seek(0, os.SEEK_END)
+            file.seek(0)
             while True:
                 chunk = file.read(chunk_size)
                 if not chunk:
                     break
-                meta_class.load_from_chunk(chunk)
+                meta_class.load_from_chunk(chunk, file_size)
 
     def test_full(self):
         """Both the file and filename contain metadata. There are thumbnails.
@@ -212,16 +215,28 @@ class TestFDNMetaData:
         assert 'nozzle_diameter' not in meta.data
         assert 'temperature' not in meta.data
 
-    def test_from_chunks(self):
-        """Test chunks from file read ok"""
+    @pytest.mark.parametrize('chunk_size',
+                             [10 * 1024, 20 * 1024 * 1024, 2 * 1024 * 1024])
+    def test_from_chunks(self, chunk_size):
+        """Test chunks from file read ok. Test on several chunk size."""
         fname = os.path.join(gcodes_dir,
                              "fdn_full_0.15mm_PETG_MK3S_2h6m.gcode")
         chunk_meta = get_meta_class(fname)
-        self.chunk_read_file(chunk_meta, fname)
+        self.chunk_read_file(chunk_meta, fname, chunk_size)
         # check that same result came from parsing metadata as a whole file
         meta = get_metadata(fname, False)
         assert meta.thumbnails == chunk_meta.thumbnails
         assert meta.data == chunk_meta.data
+
+    def test_from_chunks_fake_data(self):
+        """Test chunks fake file without metadata with string"""
+        data = b'*\n' * 1024 * 1024 * 200  # 400 MB file
+        chunk_meta = get_meta_class('fake_file.gcode')
+        chunk_size = 10 * 1024  # 10 KiB test on small chunks
+        data_size = len(data)
+        for i in range(0, data_size, chunk_size):
+            chunk_meta.load_from_chunk(data[i:i + chunk_size], data_size)
+        assert not chunk_meta.data
 
     def test_from_chunks_meta_only_path(self):
         """Test chunks from file with no metadata."""
