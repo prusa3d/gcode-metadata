@@ -364,8 +364,8 @@ class FDMMetaData(MetaData):
     }
 
     FDM_FILENAME_PAT = re.compile(
-        r"^(?P<name>.*?)_(?P<height>[0-9.]+)mm_"
-        r"(?P<material>\w+)_(?P<printer>\w+)_(?P<time>.*)\.")
+        r"^(?P<name>.*?)_(?P<height>[0-9.]+)mm_(?P<material>[A-Za-z]+)_"
+        r"(?P<printer>[A-Za-z0-9]+)_(?P<time>[A-Za-z0-9]+)_?\w*.")
 
     METADATA_START_OFFSET = 400000  # Read 400KB from the start
     METADATA_END_OFFSET = 40000  # Read 40KB at the end of the file
