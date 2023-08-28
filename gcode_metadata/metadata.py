@@ -31,6 +31,20 @@ RE_ESTIMATED = re.compile(r"((?P<days>[0-9]+)d\s*)?"
                           r"((?P<minutes>[0-9]+)m\s*)?"
                           r"((?P<seconds>[0-9]+)s)?")
 
+PRINTERS = [
+        'MK4IS', 'MK4MMU3', 'MK4', 'MK3SMMU3', 'MK3MMU3', 'MK3SMMU2S',
+        'MK3MMU2', 'MK3S', 'MK3', 'MK2.5SMMU2S', 'MK2.5MMU2', 'MK2.5S',
+        'MK2.5', 'MINI', 'XL5', 'XL4', 'XL3', 'XL2', 'XL', 'iX', 'SL1',
+        'SHELF', 'EXTRACTOR', 'HARVESTER'
+    ]
+
+PRINTERS.sort(key=len, reverse=True)
+
+MATERIALS = [
+    'PLA', 'PETG', 'ABS', 'ASA', 'FLEX', 'HIPS', 'EDGE', 'NGEN', 'PA',
+    'PVA', 'PCTG', 'PP', 'PC', 'TPU', 'PEBA', 'CPE', 'PVB', 'PET'
+]
+
 
 class UnknownGcodeFileType(ValueError):
     # pylint: disable=missing-class-docstring
@@ -97,6 +111,52 @@ def same_or_nothing(value_list):
     if any(x != value_list[0] for x in value_list):
         raise ValueError("The values were not the same")
     return value_list[0]
+
+
+def extract_data(input_string):
+    """Extracts metadata from the filename
+        >>> extract_data("HP_PLA,PLA_MK3SMMU3_3h22m.gcode") #doctest: +ELLIPSIS
+        {... 'material': 'PLA', 'printer': 'MK3SMMU3', 'time': '3h22m'}
+        >>> extract_data("sh_bn_0.6n_0.32mm_PETG_MK4_8h55m.gcode")['material']
+        'PETG'
+        >>> extract_data("PLA_0.6n 0.32mm_MK3S_1d1h42m")['printer']
+        'MK3S'
+        >>> extract_data("42.gcode")['printer'] is None
+        True
+        >>> extract_data("Tisk tohoto souboru bude trvat 1d18h15m")['time']
+        '1d18h15m'
+        >>> extract_data("+ěščřžýáíé \\/ -.:<>.gcode") #doctest: +ELLIPSIS
+        {'name': None, ..., 'material': None, 'printer': None, 'time': None}
+        >>> extract_data("Tohle je PLA, nebo PETG, nevim.gcode")['material']
+        'PLA'
+        >>> extract_data("ßüäö")['printer'] is None
+        True
+    """
+
+    # mat_pat = material pattern, prt_pat = printer pattern
+    patterns = [
+        (r"(.*?)(?=[0-9.]+n|mm|{mat_pat}|{prt_pat}|\d+[dhm]+)", 'name'),
+        (r"([0-9.]+)n", 'nozzle'),
+        (r"([0-9.]+)mm", 'height'),
+        (r"(?:" + "|".join(MATERIALS) + r")", 'material'),
+        (r"(?:" + "|".join(PRINTERS) + r")", 'printer'),
+        (r"(\d+[dhm]+(?:\d*[dhm]+)*)(?!\w)", 'time')
+    ]
+
+    data = {}
+    for pattern, key in patterns:
+        pattern = pattern.format(mat_pat="|".join(MATERIALS),
+                                 prt_pat="|".join(PRINTERS))
+        match = re.search(pattern, input_string)
+        if match:
+            if key in ('nozzle', 'height'):
+                data[key] = float(match.group(1))
+            else:
+                data[key] = match.group()
+        else:
+            data[key] = None
+
+    return data
 
 
 class MetaData:
@@ -363,10 +423,6 @@ class FDMMetaData(MetaData):
         "normal_change_in": "normal_change_in_present"
     }
 
-    FDM_FILENAME_PAT = re.compile(
-        r"^(?P<name>.*?)_(?P<height>[0-9.]+)mm_(?P<material>[A-Za-z]+)_"
-        r"(?P<printer>[A-Za-z0-9]+)_(?P<time>[A-Za-z0-9]+)_?\w*.")
-
     METADATA_START_OFFSET = 400000  # Read 400KB from the start
     METADATA_END_OFFSET = 40000  # Read 40KB at the end of the file
     # Number of times the search for M73 is going to repeat if info
@@ -390,16 +446,18 @@ class FDMMetaData(MetaData):
     def load_from_path(self, path):
         """Try to obtain any usable metadata from the path itself"""
         filename = os.path.basename(path)
-        match = self.FDM_FILENAME_PAT.match(filename)
-        if match:
-            data = {
-                "name": match.group("name"),
-                "layer_height": match.group("height"),
-                "filament_type": match.group("material"),
-                "printer_model": match.group("printer"),
-                "estimated printing time (normal mode)": match.group("time"),
-            }
-            self.set_data(data)
+        data = extract_data(filename)
+
+        result = {
+            "name": data["name"],
+            "nozzle_diameter": data["nozzle"],
+            "layer_height": data["height"],
+            "filament_type": data["material"],
+            "printer_model": data["printer"],
+            "estimated printing time (normal mode)": data["time"]
+        }
+
+        self.set_data(result)
 
     def from_comment_line(self, line):
         """Parses data from a line in the comments"""
