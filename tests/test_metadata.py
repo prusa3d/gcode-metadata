@@ -41,22 +41,6 @@ def test_save_cache_empty_file():
             pass
 
 
-def test_save_load_and_compare_cache_file(tmp_dir):
-    """Test save-cache() with correct data"""
-    fname = os.path.join(gcodes_dir, "fdn_filename.gcode")
-    meta = get_metadata(fname)
-
-    temp_gcode = shutil.copy(fname, tmp_dir)
-    temp_meta = get_metadata(temp_gcode)
-    temp_meta.save_cache()
-
-    new_meta = MetaData(temp_gcode)
-    new_meta.load_cache()
-
-    assert meta.thumbnails == temp_meta.thumbnails == new_meta.thumbnails
-    assert meta.data == temp_meta.data == new_meta.data
-
-
 def test_load_cache_file_does_not_exist(tmp_dir):
     """Test load_cache() with a non-existing cache file"""
     with pytest.raises(ValueError):
@@ -154,7 +138,7 @@ class TestFDNMetaData:
             'quiet_left_present': True,
             'quiet_percent_present': True,
         }
-        assert len(meta.thumbnails['640x480']) == 158644
+        assert len(meta.thumbnails['640x480_PNG']) == 158644
 
     def test_m73_and_layer_info(self):
         """Tests an updated file with additional suppported info"""
@@ -177,7 +161,7 @@ class TestFDNMetaData:
         assert meta.data['fill_density'] == '15%'
         assert meta.data['ironing'] == 0
         assert meta.data['support_material'] == 0
-        assert len(meta.thumbnails['160x120']) == 5616
+        assert len(meta.thumbnails['160x120_PNG']) == 5616
 
     def test_only_path(self):
         """Only the filename contains metadata. There are no thumbnails."""

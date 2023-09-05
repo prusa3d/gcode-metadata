@@ -34,6 +34,8 @@ MATERIALS = [
     'PCTG', 'PP', 'PC', 'TPU', 'PEBA', 'CPE', 'PVB', 'PET'
 ]
 
+IMAGE_FORMATS = ['PNG', 'JPG']
+
 
 class UnknownGcodeFileType(ValueError):
     # pylint: disable=missing-class-docstring
@@ -50,22 +52,14 @@ def check_gcode_completion(path):
     log.debug(path)
 
 
-def thumbnail_from_bytes(data_input):
-    """Parse thumbnail from bytes to string format because
-    of JSON serialization requirements"""
-    converted_data = {}
-    for key, value in data_input.items():
-        if isinstance(value, bytes):
-            converted_data[key] = str(value, 'utf-8')
-    return converted_data
+def from_bytes(data) -> str:
+    """Convert data in bytes to string"""
+    return str(data, 'utf-8')
 
 
-def thumbnail_to_bytes(data_input):
-    """Parse thumbnail from string to original bytes format"""
-    converted_data = {}
-    for key, value in data_input.items():
-        converted_data[key] = bytes(value, 'utf-8')
-    return converted_data
+def to_bytes(data) -> bytes:
+    """Convert string to data in bytes"""
+    return bytes(data, 'utf-8')
 
 
 def estimated_to_seconds(value: str):
@@ -114,7 +108,7 @@ def extract_data(input_string):
         True
         >>> extract_data("Tisk tohoto souboru bude trvat 1d18h15m")['time']
         '1d18h15m'
-        >>> extract_data("+ěščřžýáíé \\/ -.:<>.gcode") #doctest: +ELLIPSIS
+        >>> extract_data("+ěščřžýáíé / -.:<>.gcode") #doctest: +ELLIPSIS
         {'name': None, ..., 'material': None, 'printer': None, 'time': None}
         >>> extract_data("Tohle je PLA, nebo PETG, nevim.gcode")['material']
         'PLA'
@@ -193,15 +187,43 @@ class MetaData:
 
     def save_cache(self):
         """Take metadata from source file and save them as JSON to
-        <file_name>.cache file"""
+        <file_name>.cache file.
+        Parse thumbnail from bytes to string format because of JSON
+        serialization requirements"""
         try:
-            if self.thumbnails or self.data:
-                dict_data = {
-                    "thumbnails": thumbnail_from_bytes(self.thumbnails),
-                    "data": self.data
+            if self.data:
+                cache = {
+                    "metadata": self.data,
                 }
+
+                if self.thumbnails:
+                    preview = get_preview(self.thumbnails)
+                    icon = get_icon(self.thumbnails)
+
+                    if preview:
+                        prev_res = preview[0]
+                        prev_format = preview[1]
+
+                        cache["preview"] = {
+                            "resolution": prev_res,
+                            "data": from_bytes(
+                                self.thumbnails[f"{prev_res}_{prev_format}"]),
+                            "format": prev_format
+                        }
+
+                    if icon:
+                        icon_res = icon[0]
+                        icon_format = icon[1]
+
+                        cache["icon"] = {
+                            "resolution": icon_res,
+                            "data": from_bytes(
+                                self.thumbnails[f"{icon_res}_{icon_format}"]),
+                            "format": icon_format
+                        }
+
                 with open(self.cache_name, "w", encoding='utf-8') as file:
-                    json.dump(dict_data, file, indent=2)
+                    json.dump(cache, file, indent=2)
         except PermissionError:
             log.warning("You don't have permission to save file here")
 
@@ -210,8 +232,21 @@ class MetaData:
         try:
             with open(self.cache_name, "r", encoding='utf-8') as file:
                 cache_data = json.load(file)
-            self.thumbnails = thumbnail_to_bytes(cache_data["thumbnails"])
-            self.data = cache_data["data"]
+                preview = cache_data["preview"]
+                icon = cache_data["icon"]
+
+            self.thumbnails = {}
+
+            if preview:
+                self.thumbnails[
+                    f"{preview['resolution']}_{preview['format']}"] = to_bytes(
+                    preview["data"])
+            if icon:
+                self.thumbnails[
+                    f"{icon['resolution']}_{icon['format']}"] = to_bytes(
+                    icon["data"])
+
+            self.data = cache_data["metadata"]
         except (json.decoder.JSONDecodeError, FileNotFoundError, KeyError)\
                 as err:
             raise ValueError(
@@ -304,6 +339,7 @@ class MMUAttribute:
 
 class FDMMetaData(MetaData):
     """Class for extracting Metadata for FDM gcodes"""
+    # pylint: disable=too-many-instance-attributes
 
     def set_attr(self, name, value):
         """Set an attribute, but add support for mmu list attributes"""
@@ -373,7 +409,6 @@ class FDMMetaData(MetaData):
         "normal_change_in_present": bool,
         "layer_info_present": bool,
         "max_layer_z": float,
-        "thumbnails_format": str,
     }
 
     # Add attributes that have multiple values in MMU print gcodes
@@ -425,9 +460,10 @@ class FDMMetaData(MetaData):
 
         # When in the process of parsing an image, these won't be None
         # Parsed as in currently being parsed
-        self.parsed_image_dimensions = None
-        self.parsed_image_size = None
-        self.parsed_image = None
+        self.img_format = None
+        self.img_dimensions = None
+        self.img_size = None
+        self.img = None
 
         self.m73_searched_bytes = 0
 
@@ -452,26 +488,32 @@ class FDMMetaData(MetaData):
         # thumbnail handling
         match = self.THUMBNAIL_BEGIN_PAT.match(line)
         if match:
-            self.parsed_image_dimensions = match.group("dim")
-            self.parsed_image_size = int(match.group("size"))
-            self.parsed_image = []
+            img_format = match.group("format")
+
+            # PNG is not explicitly described in thumbnails header
+            self.img_format = "PNG" if img_format == "" else img_format
+            self.img_dimensions = match.group("dim")
+            self.img_size = int(match.group("size"))
+            self.img = []
             return
 
         match = self.THUMBNAIL_END_PAT.match(line)
         if match:
-            image_data = "".join(self.parsed_image)
-            self.thumbnails[self.parsed_image_dimensions] = image_data.encode()
-            assert len(image_data) == self.parsed_image_size, len(image_data)
+            img_data = "".join(self.img)
+            key = f"{self.img_dimensions}_{self.img_format}"
+            self.thumbnails[key] = img_data.encode()
+            assert len(img_data) == self.img_size, len(img_data)
 
-            self.parsed_image_dimensions = None
-            self.parsed_image_size = None
-            self.parsed_image = None
+            self.img_format = None
+            self.img_dimensions = None
+            self.img_size = None
+            self.img = None
             return
 
         # We store the image data only during parsing. If actively parsing:
-        if self.parsed_image is not None:
+        if self.img is not None:
             line = line[2:].strip()
-            self.parsed_image.append(line)
+            self.img.append(line)
 
         # For the bulk of metadata comments
         match = self.KEY_VAL_PAT.match(line)
@@ -733,41 +775,97 @@ def get_meta_class(path: str, filename: Optional[str] = None):
     return meta_class
 
 
-def biggest_resolution(thumbnails: Dict[str, bytes]):
-    """Get the thumbnail with the biggest resolution from the list of
+def get_preview(thumbnails: Dict[str, bytes]) -> Optional[List]:
+    """Get the preview with the biggest resolution from the list of
     thumbnails
 
-    >>> biggest_resolution({'8000x200': b'', '600x400': b'', '800x600': b''})
-    '800x600'
-    >>> biggest_resolution({'600x1': b'', '320x240': b'', '800x9000': b''})
-    '320x240'
-    >>> biggest_resolution({'500x100': b'', '50x50': b'', '900x400': b''})
-    '50x50'
-    >>> biggest_resolution({'500x200': b''})
-    '500x200'
+    >>> get_preview(
+    ... {'8000x20_PNG': b'', '600x400_PNG': b'', '800x600_PNG': b''})
+    ['800x600', 'PNG']
+    >>> get_preview(
+    ... {'600x1_PNG': b'', '320x240_PNG': b'', '800x9000_PNG': b''})
+    ['320x240', 'PNG']
+    >>> get_preview(
+    ... {'500x100_PNG': b'', '50x50_PNG': b'', '900x400_PNG': b''})
+    ['50x50', 'PNG']
+    >>> get_preview({'500x200_PNG': b''})
+    ['500x200', 'PNG']
     """
-    max_resolution_key = None
+
+    max_res_key = None
     max_res = 0
+    format_ = None
 
-    for resolution in thumbnails:
+    def get_dims(key: str):
+        width, height = map(int, key.split("_")[0].split("x"))
+        return [width, height]
+
+    def calculate_area(key: str) -> int:
+        """Calculate and return the area of a resolution key."""
+        dims = get_dims(key)
+        return dims[0] * dims[1]
+
+    def calculate_ratio(key: str) -> float:
+        """Calculate and return the ratio of a resolution key."""
+        dims = get_dims(key)
+        return dims[0] / dims[1]
+
+    for thumbnail_key in thumbnails.keys():
+        resolution_key, format_key = thumbnail_key.split("_")
+
+        if format_key in IMAGE_FORMATS:
+            area = calculate_area(resolution_key)
+            ratio = calculate_ratio(resolution_key)
+
+            if 1 <= ratio <= 2 and area > max_res:
+                max_res = area
+                max_res_key = resolution_key
+                format_ = format_key
+
+    if max_res_key is None:
+        log.info("No thumbnail with a suitable area found.")
+
+        max_thumbnail_key = max(thumbnails.keys(), key=calculate_area)
+        max_res_key, format_ = max_thumbnail_key.split('_')
+
+    return [max_res_key, format_]
+
+
+def get_icon(thumbnails: Dict[str, bytes]) -> Optional[List[str]]:
+    """Get the icon which suits best according given parameters
+
+    >>> get_icon({'8000x20_PNG': b'', '600x400_PNG': b'', '800x600_PNG': b''})
+    ['600x400', 'PNG']
+    >>> get_icon({'600x1_PNG': b'', '320x240_PNG': b'', '800x9000_PNG': b''})
+    ['320x240', 'PNG']
+    >>> get_icon({'500x100_PNG': b'', '50x50_PNG': b'', '120x110_PNG': b''})
+    ['120x110', 'PNG']
+    >>> get_icon({'50x20_PNG': b''}) is None
+    True
+    """
+    valid_thumbnails = []
+    for thumbnail in thumbnails.keys():
+        resolution, format_ = thumbnail.split("_")
+        if format_ in IMAGE_FORMATS:
+            if all(int(num) >= 100 for num in resolution.split('x')):
+                valid_thumbnails.append((resolution, format_))
+
+    if not valid_thumbnails:
+        return None
+
+    def sort_key(item_):
+        res = item_[0]
+        return int(res.split('x')[0]), int(res.split('x')[1])
+
+    sorted_thumbnails = sorted(valid_thumbnails, key=sort_key)
+
+    for resolution, format_ in sorted_thumbnails:
         width, height = map(int, resolution.split('x'))
+        if width == height:
+            return [resolution, format_]
 
-        # Calculate ratio and consider only values in between 1 and 2
-        ratio = width / height
-        res = width * height
-        if 1 <= ratio <= 2:
-            if res > max_res:
-                max_res = res
-                max_resolution_key = resolution
-        else:
-            log.info("Thumbnail ratio is not between 1 and 2: %s", ratio)
-
-    if max_resolution_key is None:
-        log.info("No thumbnail with ratio between 1 and 2 found. "
-                 "Using biggest thumbnail.")
-        max_resolution_key = max(thumbnails.keys())
-
-    return max_resolution_key
+    # Return a list of resolution and format e.g. ['120x120', 'PNG']
+    return [sorted_thumbnails[0][0], sorted_thumbnails[0][1]]
 
 
 if __name__ == "__main__":
