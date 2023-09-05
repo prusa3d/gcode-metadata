@@ -1,7 +1,7 @@
 """Init file describing every importable object"""
 
 from .metadata import MetaData, FDMMetaData, SLMetaData, get_metadata, \
-    UnknownGcodeFileType, estimated_to_seconds, biggest_resolution, \
+    UnknownGcodeFileType, estimated_to_seconds, get_preview, get_icon, \
     get_meta_class
 
 __version__ = "0.1.0"
@@ -17,6 +17,6 @@ __url__ = "https://github.com/prusa3d/gcode-metadata"
 
 __all__ = [
     "MetaData", "FDMMetaData", "SLMetaData", "get_metadata",
-    "UnknownGcodeFileType", "estimated_to_seconds", "biggest_resolution",
+    "UnknownGcodeFileType", "estimated_to_seconds", "get_preview", "get_icon",
     "get_meta_class"
 ]
