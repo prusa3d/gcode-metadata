@@ -42,6 +42,42 @@ class UnknownGcodeFileType(ValueError):
     ...
 
 
+class ImageInfo:
+    """A class to hold image info for thumbnail selection purposes"""
+
+    def __init__(self, width, height, format_):
+        self.width = width
+        self.height = height
+        self.format = format_
+
+    @property
+    def area(self):
+        """Gets the image area in pixels"""
+        return self.width * self.height
+
+    @property
+    def ratio(self):
+        """Gets the image ratio"""
+        return self.width / self.height
+
+    @staticmethod
+    def from_thumbnail_info(info: str):
+        """Parses thumbnail info from string thumbnail key format"""
+        string_resolution, format_ = info.split("_")
+        width, height = tuple(map(int, string_resolution.split('x')))
+        return ImageInfo(width, height, format_)
+
+    def to_thumbnail_info(self):
+        """Returns thumbnail info in string thumbnail key format"""
+        return f"{self.width}x{self.height}_{self.format}"
+
+    def __str__(self):
+        return self.to_thumbnail_info()
+
+    def __repr__(self):
+        return f'ImageInfo("{str(self)}")'
+
+
 def get_mmu_name(name):
     """Returns a name for the new list value item"""
     return f"{name} per tool"
@@ -190,6 +226,15 @@ class MetaData:
         <file_name>.cache file.
         Parse thumbnail from bytes to string format because of JSON
         serialization requirements"""
+        def get_cache_data(info):
+            width, height = info.width, info.height
+
+            return {
+                "resolution": f"{width}x{height}",
+                "data": from_bytes(self.thumbnails[info.to_thumbnail_info()]),
+                "format": info.format
+            }
+
         try:
             if self.data:
                 cache = {
@@ -197,30 +242,12 @@ class MetaData:
                 }
 
                 if self.thumbnails:
-                    preview = get_preview(self.thumbnails)
-                    icon = get_icon(self.thumbnails)
 
-                    if preview:
-                        prev_res = preview[0]
-                        prev_format = preview[1]
+                    if preview := get_preview(self.thumbnails):
+                        cache["preview"] = get_cache_data(preview)
 
-                        cache["preview"] = {
-                            "resolution": prev_res,
-                            "data": from_bytes(
-                                self.thumbnails[f"{prev_res}_{prev_format}"]),
-                            "format": prev_format
-                        }
-
-                    if icon:
-                        icon_res = icon[0]
-                        icon_format = icon[1]
-
-                        cache["icon"] = {
-                            "resolution": icon_res,
-                            "data": from_bytes(
-                                self.thumbnails[f"{icon_res}_{icon_format}"]),
-                            "format": icon_format
-                        }
+                    if icon := get_icon(self.thumbnails):
+                        cache["icon"] = get_cache_data(icon)
 
                 with open(self.cache_name, "w", encoding='utf-8') as file:
                     json.dump(cache, file, indent=2)
@@ -238,13 +265,11 @@ class MetaData:
             self.thumbnails = {}
 
             if preview:
-                self.thumbnails[
-                    f"{preview['resolution']}_{preview['format']}"] = to_bytes(
-                    preview["data"])
+                key = f"{preview['resolution']}_{preview['format']}"
+                self.thumbnails[key] = to_bytes(preview["data"])
             if icon:
-                self.thumbnails[
-                    f"{icon['resolution']}_{icon['format']}"] = to_bytes(
-                    icon["data"])
+                key = f"{icon['resolution']}_{icon['format']}"
+                self.thumbnails[key] = to_bytes(icon["data"])
 
             self.data = cache_data["metadata"]
         except (json.decoder.JSONDecodeError, FileNotFoundError, KeyError)\
@@ -775,97 +800,73 @@ def get_meta_class(path: str, filename: Optional[str] = None):
     return meta_class
 
 
-def get_preview(thumbnails: Dict[str, bytes]) -> Optional[List]:
+def get_preview(thumbnails: Dict[str, bytes]) -> Optional[ImageInfo]:
     """Get the preview with the biggest resolution from the list of
     thumbnails
 
     >>> get_preview(
     ... {'8000x20_PNG': b'', '600x400_PNG': b'', '800x600_PNG': b''})
-    ['800x600', 'PNG']
+    ImageInfo("800x600_PNG")
     >>> get_preview(
     ... {'600x1_PNG': b'', '320x240_PNG': b'', '800x9000_PNG': b''})
-    ['320x240', 'PNG']
+    ImageInfo("320x240_PNG")
     >>> get_preview(
     ... {'500x100_PNG': b'', '50x50_PNG': b'', '900x400_PNG': b''})
-    ['50x50', 'PNG']
+    ImageInfo("50x50_PNG")
     >>> get_preview({'500x200_PNG': b''})
-    ['500x200', 'PNG']
+    ImageInfo("500x200_PNG")
     """
 
-    max_res_key = None
-    max_res = 0
-    format_ = None
-
-    def get_dims(key: str):
-        width, height = map(int, key.split("_")[0].split("x"))
-        return [width, height]
-
-    def calculate_area(key: str) -> int:
-        """Calculate and return the area of a resolution key."""
-        dims = get_dims(key)
-        return dims[0] * dims[1]
-
-    def calculate_ratio(key: str) -> float:
-        """Calculate and return the ratio of a resolution key."""
-        dims = get_dims(key)
-        return dims[0] / dims[1]
+    best_image = None
+    backup_image = None
 
     for thumbnail_key in thumbnails.keys():
-        resolution_key, format_key = thumbnail_key.split("_")
+        info: ImageInfo = ImageInfo.from_thumbnail_info(thumbnail_key)
 
-        if format_key in IMAGE_FORMATS:
-            area = calculate_area(resolution_key)
-            ratio = calculate_ratio(resolution_key)
+        if info.format in IMAGE_FORMATS:
+            if not backup_image or info.area > backup_image.area:
+                backup_image = info
+            if not best_image or info.area > best_image.area:
+                if 1 <= info.ratio <= 2:
+                    best_image = info
 
-            if 1 <= ratio <= 2 and area > max_res:
-                max_res = area
-                max_res_key = resolution_key
-                format_ = format_key
-
-    if max_res_key is None:
-        log.info("No thumbnail with a suitable area found.")
-
-        max_thumbnail_key = max(thumbnails.keys(), key=calculate_area)
-        max_res_key, format_ = max_thumbnail_key.split('_')
-
-    return [max_res_key, format_]
+    if best_image is None:
+        log.info("No thumbnail with a suitable aspect ration found.")
+        return backup_image
+    return best_image
 
 
-def get_icon(thumbnails: Dict[str, bytes]) -> Optional[List[str]]:
+def get_icon(thumbnails: Dict[str, bytes]) -> Optional[ImageInfo]:
     """Get the icon which suits best according given parameters
 
     >>> get_icon({'8000x20_PNG': b'', '600x400_PNG': b'', '800x600_PNG': b''})
-    ['600x400', 'PNG']
+    ImageInfo("600x400_PNG")
     >>> get_icon({'600x1_PNG': b'', '320x240_PNG': b'', '800x9000_PNG': b''})
-    ['320x240', 'PNG']
+    ImageInfo("320x240_PNG")
     >>> get_icon({'500x100_PNG': b'', '50x50_PNG': b'', '120x110_PNG': b''})
-    ['120x110', 'PNG']
+    ImageInfo("120x110_PNG")
     >>> get_icon({'50x20_PNG': b''}) is None
     True
     """
-    valid_thumbnails = []
+    valid_thumbnails: List[ImageInfo] = []
     for thumbnail in thumbnails.keys():
-        resolution, format_ = thumbnail.split("_")
-        if format_ in IMAGE_FORMATS:
-            if all(int(num) >= 100 for num in resolution.split('x')):
-                valid_thumbnails.append((resolution, format_))
+        info: ImageInfo = ImageInfo.from_thumbnail_info(thumbnail)
+        if info.format in IMAGE_FORMATS:
+            if info.width >= 100 and info.height >= 100:
+                valid_thumbnails.append(info)
 
     if not valid_thumbnails:
         return None
 
-    def sort_key(item_):
-        res = item_[0]
-        return int(res.split('x')[0]), int(res.split('x')[1])
+    sorted_thumbnails: List[ImageInfo] = sorted(
+        valid_thumbnails, key=lambda x: x.area
+    )
 
-    sorted_thumbnails = sorted(valid_thumbnails, key=sort_key)
+    for info in sorted_thumbnails:
+        if info.ratio == 1:
+            return info
 
-    for resolution, format_ in sorted_thumbnails:
-        width, height = map(int, resolution.split('x'))
-        if width == height:
-            return [resolution, format_]
-
-    # Return a list of resolution and format e.g. ['120x120', 'PNG']
-    return [sorted_thumbnails[0][0], sorted_thumbnails[0][1]]
+    return sorted_thumbnails[0]
 
 
 if __name__ == "__main__":
