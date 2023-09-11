@@ -51,14 +51,38 @@ class ImageInfo:
         self.format = format_
 
     @property
-    def area(self):
-        """Gets the image area in pixels"""
-        return self.width * self.height
-
-    @property
     def ratio(self):
         """Gets the image ratio"""
         return self.width / self.height
+
+    @staticmethod
+    def dimension_badness(width, target_width):
+        """Returns a badness score for the size difference between the image
+        and the target dimension. The score is higher when the dimension is
+        smaller than the target dimension"""
+        size_difference = width - target_width
+        if size_difference < 0:
+            return (abs(size_difference) + 2) ** 2
+        return size_difference
+
+    def badness(self, target: "ImageInfo", aspect_ratio_weight=1):
+        """Returns a badness score for this image compared to the target"""
+        # This gives a value between 1 and infinity
+        ar_badness = (max(self.ratio, target.ratio)
+                      / min(self.ratio, target.ratio))
+
+        width_badness = self.dimension_badness(self.width, target.width)
+        height_badness = self.dimension_badness(self.height, target.height)
+        size_badness = width_badness + height_badness
+
+        # The aspect ratio weight of 2 would square aspect ratio badness
+        # while using a square root on the size badness
+        # As the aspect ratio minimum is 1, let's make the lowest value
+        # 0.01 by subtracting 0.99
+        weighted_ar_badness = ar_badness ** aspect_ratio_weight - 0.99
+        weighted_size_badness = size_badness ** (1/aspect_ratio_weight)
+
+        return weighted_ar_badness * weighted_size_badness
 
     @staticmethod
     def from_thumbnail_info(info: str):
@@ -800,6 +824,29 @@ def get_meta_class(path: str, filename: Optional[str] = None):
     return meta_class
 
 
+def get_closest_image(thumbnails: Dict[str, bytes],
+                      target: ImageInfo,
+                      aspect_ratio_weight: float = 1.0) -> Optional[ImageInfo]:
+    """Get the image with the closest resolution
+    and aspect ratio to the target
+    The weight of aspect ratio to resolution proximity can be tweaked"""
+    valid_thumbnails: List[ImageInfo] = []
+    for thumbnail in thumbnails.keys():
+        info: ImageInfo = ImageInfo.from_thumbnail_info(thumbnail)
+        if info.format in IMAGE_FORMATS:
+            if info.width >= 50 and info.height >= 50:
+                valid_thumbnails.append(info)
+
+    if not valid_thumbnails:
+        return None
+
+    sorted_thumbnails: List[ImageInfo] = sorted(
+        valid_thumbnails, key=lambda x: x.badness(target, aspect_ratio_weight)
+    )
+
+    return sorted_thumbnails[0]
+
+
 def get_preview(thumbnails: Dict[str, bytes]) -> Optional[ImageInfo]:
     """Get the preview with the biggest resolution from the list of
     thumbnails
@@ -812,28 +859,14 @@ def get_preview(thumbnails: Dict[str, bytes]) -> Optional[ImageInfo]:
     ImageInfo("320x240_PNG")
     >>> get_preview(
     ... {'500x100_PNG': b'', '50x50_PNG': b'', '900x400_PNG': b''})
-    ImageInfo("50x50_PNG")
+    ImageInfo("900x400_PNG")
     >>> get_preview({'500x200_PNG': b''})
     ImageInfo("500x200_PNG")
     """
 
-    best_image = None
-    backup_image = None
-
-    for thumbnail_key in thumbnails.keys():
-        info: ImageInfo = ImageInfo.from_thumbnail_info(thumbnail_key)
-
-        if info.format in IMAGE_FORMATS:
-            if not backup_image or info.area > backup_image.area:
-                backup_image = info
-            if not best_image or info.area > best_image.area:
-                if 1 <= info.ratio <= 2:
-                    best_image = info
-
-    if best_image is None:
-        log.info("No thumbnail with a suitable aspect ration found.")
-        return backup_image
-    return best_image
+    return get_closest_image(thumbnails,
+                             ImageInfo(640, 480, "PNG"),
+                             aspect_ratio_weight=1)
 
 
 def get_icon(thumbnails: Dict[str, bytes]) -> Optional[ImageInfo]:
@@ -848,25 +881,9 @@ def get_icon(thumbnails: Dict[str, bytes]) -> Optional[ImageInfo]:
     >>> get_icon({'50x20_PNG': b''}) is None
     True
     """
-    valid_thumbnails: List[ImageInfo] = []
-    for thumbnail in thumbnails.keys():
-        info: ImageInfo = ImageInfo.from_thumbnail_info(thumbnail)
-        if info.format in IMAGE_FORMATS:
-            if info.width >= 100 and info.height >= 100:
-                valid_thumbnails.append(info)
-
-    if not valid_thumbnails:
-        return None
-
-    sorted_thumbnails: List[ImageInfo] = sorted(
-        valid_thumbnails, key=lambda x: x.area
-    )
-
-    for info in sorted_thumbnails:
-        if info.ratio == 1:
-            return info
-
-    return sorted_thumbnails[0]
+    return get_closest_image(thumbnails,
+                             ImageInfo(100, 100, "PNG"),
+                             aspect_ratio_weight=1)
 
 
 if __name__ == "__main__":
