@@ -5,18 +5,38 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "gcode-metadata"
 version = "0.1.0"
-authors = [
-  { name="Michal Zoubek", email="link@prusa3d.com" },
-]
 description = "Python library for extraction of metadata from g-code files"
-readme = "README.md"
+readme = {file = "README.md", content-type="text/markdown"}
+license = {text = "LGPLv2+"}
+
+authors = [
+    {name = "Prusa Connect Developers", email = "link@prusa3d.cz"},
+]
+maintainers = [
+    {name = "Ondřej Tůma", email = "mcbig@zeropage.cz"},
+    {name = "Michal Zoubek", email = "michal.zoubek@prusa3d.cz"},
+    {name = "Tomáš Jozífek", email = "jozifektomas@gmail.com"},
+    {name = "Šárka Faloutová", email = "sarka.faloutova@prusa3d.cz"},
+    {name = "Martin Užák", email = "martin.uzak@prusa3d.cz"},
+]
+
 requires-python = ">=3.9"
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU Lesser General Public License v2 (LGPLv2)",
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "License :: OSI Approved :: GNU Lesser General Public License v2 or later (LGPLv2+)",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
 [project.urls]
 "Homepage" = "https://github.com/prusa3d/gcode-metadata"
 "Bug Tracker" = "https://github.com/prusa3d/gcode-metadata/issues"
+
+[tool.setuptools]
+packages = ["gcode_metadata"]
+
+[tool.setuptools.package-data]
+"gcode_metadata" = ["py.typed"]

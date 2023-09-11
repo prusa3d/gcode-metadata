@@ -10,17 +10,6 @@ import zipfile
 from typing import Dict, Any, Type, Callable, List, Optional
 from logging import getLogger
 
-__version__ = "0.1.0"
-__date__ = "14 Mar 2022"  # version date
-__copyright__ = "(c) 2021 Prusa 3D"
-__author_name__ = "Michal Zoubek"
-__author_email__ = "link@prusa3d.com"
-__author__ = f"{__author_name__} <{__author_email__}>"
-__description__ = "Python library for extraction of metadata from g-code files"
-
-__credits__ = "Ondřej Tůma, Martin Užák, Michal Zoubek, Tomáš Jozífek"
-__url__ = "https://github.com/ondratu/gcode-metadata"
-
 GCODE_EXTENSIONS = (".gcode", ".gc", ".g", ".gco")
 CHARS_TO_REMOVE = ["/", "\\", "\"", "(", ")", "[", "]", "'"]
 
@@ -32,17 +21,17 @@ RE_ESTIMATED = re.compile(r"((?P<days>[0-9]+)d\s*)?"
                           r"((?P<seconds>[0-9]+)s)?")
 
 PRINTERS = [
-        'MK4IS', 'MK4MMU3', 'MK4', 'MK3SMMU3', 'MK3MMU3', 'MK3SMMU2S',
-        'MK3MMU2', 'MK3S', 'MK3', 'MK2.5SMMU2S', 'MK2.5MMU2', 'MK2.5S',
-        'MK2.5', 'MINI', 'XL5', 'XL4', 'XL3', 'XL2', 'XL', 'iX', 'SL1',
-        'SHELF', 'EXTRACTOR', 'HARVESTER'
-    ]
+    'MK4IS', 'MK4MMU3', 'MK4', 'MK3SMMU3', 'MK3MMU3', 'MK3SMMU2S', 'MK3MMU2',
+    'MK3S', 'MK3', 'MK2.5SMMU2S', 'MK2.5MMU2', 'MK2.5S', 'MK2.5', 'MINI',
+    'XL5', 'XL4', 'XL3', 'XL2', 'XL', 'iX', 'SL1', 'SHELF', 'EXTRACTOR',
+    'HARVESTER'
+]
 
 PRINTERS.sort(key=len, reverse=True)
 
 MATERIALS = [
-    'PLA', 'PETG', 'ABS', 'ASA', 'FLEX', 'HIPS', 'EDGE', 'NGEN', 'PA',
-    'PVA', 'PCTG', 'PP', 'PC', 'TPU', 'PEBA', 'CPE', 'PVB', 'PET'
+    'PLA', 'PETG', 'ABS', 'ASA', 'FLEX', 'HIPS', 'EDGE', 'NGEN', 'PA', 'PVA',
+    'PCTG', 'PP', 'PC', 'TPU', 'PEBA', 'CPE', 'PVB', 'PET'
 ]
 
 
@@ -136,8 +125,7 @@ def extract_data(input_string):
     # mat_pat = material pattern, prt_pat = printer pattern
     patterns = [
         (r"(.*?)(?=[0-9.]+n|mm|{mat_pat}|{prt_pat}|\d+[dhm]+)", 'name'),
-        (r"([0-9.]+)n", 'nozzle'),
-        (r"([0-9.]+)mm", 'height'),
+        (r"([0-9.]+)n", 'nozzle'), (r"([0-9.]+)mm", 'height'),
         (r"(?:" + "|".join(MATERIALS) + r")", 'material'),
         (r"(?:" + "|".join(PRINTERS) + r")", 'printer'),
         (r"(\d+[dhm]+(?:\d*[dhm]+)*)(?!\w)", 'time')
