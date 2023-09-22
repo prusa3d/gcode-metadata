@@ -23,17 +23,18 @@ RE_ESTIMATED = re.compile(r"((?P<days>[0-9]+)d\s*)?"
                           r"((?P<seconds>[0-9]+)s)?")
 
 PRINTERS = [
-    'MK4IS', 'MK4MMU3', 'MK4', 'MK3SMMU3', 'MK3MMU3', 'MK3SMMU2S', 'MK3MMU2',
-    'MK3S', 'MK3', 'MK2.5SMMU2S', 'MK2.5MMU2', 'MK2.5S', 'MK2.5', 'MINI',
-    'XL5', 'XL4', 'XL3', 'XL2', 'XL', 'iX', 'SL1', 'SHELF', 'EXTRACTOR',
-    'HARVESTER'
-]
+        'MK4IS', 'MK4MMU3', 'MK4', 'MK3SMMU3', 'MK3MMU3', 'MK3SMMU2S',
+        'MK3MMU2', 'MK3S', 'MK3', 'MK2.5SMMU2S', 'MK2.5MMU2', 'MK2.5S',
+        'MK2.5', 'MK3.5', 'MK3.9', 'MINI', 'MINIIS', 'XL5', 'XL4', 'XL3',
+        'XL2', 'XL', 'iX', 'SL1', 'SHELF', 'EXTRACTOR', 'HARVESTER'
+    ]
 
 PRINTERS.sort(key=len, reverse=True)
 
 MATERIALS = [
-    'PLA', 'PETG', 'ABS', 'ASA', 'FLEX', 'HIPS', 'EDGE', 'NGEN', 'PA', 'PVA',
-    'PCTG', 'PP', 'PC', 'TPU', 'PEBA', 'CPE', 'PVB', 'PET'
+    'PLA', 'PETG', 'ABS', 'ASA', 'FLEX', 'HIPS', 'EDGE', 'NGEN', 'PA',
+    'PVA', 'PCTG', 'PP', 'PC', 'PEBA', 'CPE', 'PVB', 'PET', 'PLA Tough',
+    'METAL', 'TPU', 'NYLON'
 ]
 
 IMAGE_FORMATS = ['PNG', 'JPG']
@@ -430,7 +431,6 @@ class MMUAttribute:
 
 class FDMMetaData(MetaData):
     """Class for extracting Metadata for FDM gcodes"""
-
     # pylint: disable=too-many-instance-attributes
 
     def set_attr(self, name, value):
