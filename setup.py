@@ -9,7 +9,7 @@ def doc():
 
 
 setup(
-    name='gcode-metadata',
+    name='py-gcode-metadata',
     version='0.1.0',
     packages=['gcode_metadata'],
     url='https://github.com/prusa3d/gcode-metadata',
