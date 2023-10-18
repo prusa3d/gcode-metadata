@@ -1,5 +1,7 @@
 ChangeLog
 =========
+0.2.0dev
+    * Improve automatic thumbnail and preview selection
 
 0.1.0
-    * Inital code
+    * Initial release

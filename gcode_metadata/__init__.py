@@ -4,8 +4,8 @@ from .metadata import MetaData, FDMMetaData, SLMetaData, get_metadata, \
     UnknownGcodeFileType, estimated_to_seconds, get_preview, get_icon, \
     get_meta_class
 
-__version__ = "0.1.0"
-__date__ = "11 Sep 2023"  # version date
+__version__ = "0.2.0dev"
+__date__ = "18 Oct 2023"  # version date
 __copyright__ = "(c) 2023 Prusa 3D"
 __author_name__ = "Prusa Connect Developers"
 __author_email__ = "link@prusa3d.cz"
