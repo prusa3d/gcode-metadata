@@ -283,8 +283,8 @@ class MetaData:
         try:
             with open(self.cache_name, "r", encoding='utf-8') as file:
                 cache_data = json.load(file)
-                preview = cache_data["preview"]
-                icon = cache_data["icon"]
+                preview = cache_data.get("preview")
+                icon = cache_data.get("icon")
 
             self.thumbnails = {}
 
