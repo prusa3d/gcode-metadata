@@ -9,6 +9,7 @@ import os
 import zipfile
 from typing import Dict, Any, Type, Callable, List, Optional
 from logging import getLogger
+from importlib.metadata import version
 
 GCODE_EXTENSIONS = (".gcode", ".gc", ".g", ".gco")
 SLA_EXTENSIONS = ("sl1", "sl1s")
@@ -238,13 +239,45 @@ class MetaData:
         return new_path
 
     def is_cache_fresh(self):
-        """If cache is fresher than file, returns True"""
+        """Checks if we can use the current cache file"""
+        return self.is_cache_recent() and self.is_cache_correct_version()
+
+    def is_cache_recent(self):
+        """Checks if the cache file is newer than the source file"""
         try:
             file_time_created = os.path.getctime(self.path)
             cache_time_created = os.path.getctime(self.cache_name)
-            return file_time_created < cache_time_created
         except FileNotFoundError:
             return False
+
+        return file_time_created < cache_time_created
+
+    def is_cache_correct_version(self):
+        """Checks if the cache file was created with the same version
+        of gcode-metadata"""
+
+        def isallowed(char):
+            """Filters out disallowed characters, used with str.filter"""
+            return char not in "\",\n} "
+
+        # This expects the first item in the json file to be the
+        # gcode-metadata version, with which the cache was created.
+        # If it's not there, or the version is different, the cache is deleted
+        with open(self.cache_name, "r", encoding="utf-8") as file:
+            for line in file:
+                if text := "".join(filter(str.isalpha, line)):
+                    if text.startswith("version"):
+                        break
+                    return False
+            else:  # didn't reach break
+                return False
+            first_pair = line.split(",", 1)[0]
+            _, version_part = first_pair.split(":", 1)
+            file_version = "".join(filter(isallowed, version_part))
+            if file_version == version('py-gcode-metadata'):
+                return True
+
+        return False
 
     def save_cache(self):
         """Take metadata from source file and save them as JSON to
@@ -264,6 +297,7 @@ class MetaData:
         try:
             if self.data:
                 cache = {
+                    "version": version('py-gcode-metadata'),
                     "metadata": self.data,
                 }
 
