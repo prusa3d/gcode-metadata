@@ -1,7 +1,10 @@
 """Tests for gcode-metadata tool for g-code files."""
+import json
 import os
 import tempfile
 import shutil
+from importlib.metadata import version
+
 import time
 import pytest
 
@@ -21,6 +24,18 @@ def tmp_dir():
     temp = tempfile.TemporaryDirectory()
     yield temp.name
     del temp
+
+
+def give_cache_version(path, version_to_give):
+    """Modifies the cache file and adds a valid version number"""
+    with open(path, "r", encoding='utf-8') as cache_file:
+        cache = json.load(cache_file)
+    my_cache = {
+        "version": version_to_give
+    }
+    my_cache.update(cache)
+    with open(path, "w", encoding='utf-8') as cache_file:
+        json.dump(my_cache, cache_file)
 
 
 def test_get_metadata_file_does_not_exist():
@@ -56,26 +71,60 @@ def test_load_cache_key_error():
         MetaData(fname).load_cache()
 
 
-def test_is_cache_fresh_fresher(tmp_dir):
-    """is_cache_fresh, when cache file is fresher, than original file"""
+def test_is_cache_recent_fresher(tmp_dir):
+    """is_cache_recent, when cache file is fresher, than original file"""
     fn_gcode = os.path.join(gcodes_dir, "fdn_filename.gcode")
     temp_gcode = shutil.copy(fn_gcode, tmp_dir)
     # Create the time difference
     time.sleep(0.01)
     fn_cache = os.path.join(gcodes_dir, ".fdn_filename.gcode.cache")
-    shutil.copy(fn_cache, tmp_dir)
-    assert MetaData(temp_gcode).is_cache_fresh()
+    cache_path = shutil.copy(fn_cache, tmp_dir)
+    assert MetaData(temp_gcode).is_cache_recent()
+    os.remove(cache_path)
+    os.remove(temp_gcode)
 
 
-def test_is_cache_fresh_older(tmp_dir):
-    """is_cache_fresh, when cache file is older, than original file"""
+def test_is_cache_recent_older(tmp_dir):
+    """is_cache_recent, when cache file is older, than original file"""
     fn_cache = os.path.join(gcodes_dir, ".fdn_filename.gcode.cache")
-    shutil.copy(fn_cache, tmp_dir)
+    cache_path = shutil.copy(fn_cache, tmp_dir)
     # Create the time difference
     time.sleep(0.01)
     fn_gcode = os.path.join(gcodes_dir, "fdn_filename.gcode")
     temp_gcode = shutil.copy(fn_gcode, tmp_dir)
-    assert MetaData(temp_gcode).is_cache_fresh() is False
+    assert MetaData(temp_gcode).is_cache_recent() is False
+    os.remove(cache_path)
+    os.remove(temp_gcode)
+
+
+def test_is_cache_correct_version_none():
+    """is_cache_correct_version, when cache file has no version"""
+    fn_gcode = os.path.join(gcodes_dir, "fdn_filename.gcode")
+    assert not MetaData(fn_gcode).is_cache_correct_version()
+
+
+def test_is_cache_correct_version_mismatch(tmp_dir):
+    """is_cache_correct_version, when cache file has different version"""
+    fn_cache = os.path.join(gcodes_dir, ".fdn_filename.gcode.cache")
+    fn_gcode = os.path.join(gcodes_dir, "fdn_filename.gcode")
+    temp_gcode = shutil.copy(fn_gcode, tmp_dir)
+    cache_path = shutil.copy(fn_cache, tmp_dir)
+    give_cache_version(cache_path, "0.0.0")
+    assert MetaData(temp_gcode).is_cache_correct_version() is False
+    os.remove(cache_path)
+    os.remove(temp_gcode)
+
+
+def test_is_cache_correct_version_match(tmp_dir):
+    """is_cache_correct_version, when cache file has the same version"""
+    fn_cache = os.path.join(gcodes_dir, ".fdn_filename.gcode.cache")
+    fn_gcode = os.path.join(gcodes_dir, "fdn_filename.gcode")
+    temp_gcode = shutil.copy(fn_gcode, tmp_dir)
+    cache_path = shutil.copy(fn_cache, tmp_dir)
+    give_cache_version(cache_path, version('py-gcode-metadata'))
+    assert MetaData(temp_gcode).is_cache_correct_version() is True
+    os.remove(cache_path)
+    os.remove(temp_gcode)
 
 
 def test_get_metadata_invalid_file():
