@@ -11,6 +11,7 @@ from typing import Dict, Any, Type, Callable, List, Optional
 from logging import getLogger
 
 GCODE_EXTENSIONS = (".gcode", ".gc", ".g", ".gco")
+SLA_EXTENSIONS = ("sl1", "sl1s")
 CHARS_TO_REMOVE = ["/", "\\", "\"", "(", ")", "[", "]", "'"]
 
 log = getLogger("connect-printer")
@@ -62,14 +63,14 @@ class ImageInfo:
         smaller than the target dimension"""
         size_difference = width - target_width
         if size_difference < 0:
-            return (abs(size_difference) + 2) ** 2
+            return (abs(size_difference) + 2)**2
         return size_difference
 
     def badness(self, target: "ImageInfo", aspect_ratio_weight=1):
         """Returns a badness score for this image compared to the target"""
         # This gives a value between 1 and infinity
-        ar_badness = (max(self.ratio, target.ratio)
-                      / min(self.ratio, target.ratio))
+        ar_badness = (max(self.ratio, target.ratio) /
+                      min(self.ratio, target.ratio))
 
         width_badness = self.dimension_badness(self.width, target.width)
         height_badness = self.dimension_badness(self.height, target.height)
@@ -79,8 +80,8 @@ class ImageInfo:
         # while using a square root on the size badness
         # As the aspect ratio minimum is 1, let's make the lowest value
         # 0.01 by subtracting 0.99
-        weighted_ar_badness = ar_badness ** aspect_ratio_weight - 0.99
-        weighted_size_badness = size_badness ** (1/aspect_ratio_weight)
+        weighted_ar_badness = ar_badness**aspect_ratio_weight - 0.99
+        weighted_size_badness = size_badness**(1 / aspect_ratio_weight)
 
         return weighted_ar_badness * weighted_size_badness
 
@@ -250,6 +251,7 @@ class MetaData:
         <file_name>.cache file.
         Parse thumbnail from bytes to string format because of JSON
         serialization requirements"""
+
         def get_cache_data(info):
             width, height = info.width, info.height
 
@@ -388,6 +390,7 @@ class MMUAttribute:
 
 class FDMMetaData(MetaData):
     """Class for extracting Metadata for FDM gcodes"""
+
     # pylint: disable=too-many-instance-attributes
 
     def set_attr(self, name, value):
@@ -817,7 +820,7 @@ def get_meta_class(path: str, filename: Optional[str] = None):
     meta_class: MetaData
     if fnl.lower().endswith(GCODE_EXTENSIONS):
         meta_class = FDMMetaData(path)
-    elif fnl.lower().endswith(".sl1"):
+    elif fnl.lower().endswith(SLA_EXTENSIONS):
         meta_class = SLMetaData(path)
     else:
         raise UnknownGcodeFileType(path)
@@ -841,8 +844,7 @@ def get_closest_image(thumbnails: Dict[str, bytes],
         return None
 
     sorted_thumbnails: List[ImageInfo] = sorted(
-        valid_thumbnails, key=lambda x: x.badness(target, aspect_ratio_weight)
-    )
+        valid_thumbnails, key=lambda x: x.badness(target, aspect_ratio_weight))
 
     return sorted_thumbnails[0]
 

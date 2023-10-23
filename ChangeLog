@@ -2,6 +2,7 @@ ChangeLog
 =========
 0.2.0dev
     * Improve automatic thumbnail and preview selection
+    * `sl1s` added as sla extension gcode type
 
 0.1.0
     * Initial release
