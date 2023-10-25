@@ -26,13 +26,26 @@ def tmp_dir():
     del temp
 
 
+def chunk_read_file(meta_class, filepath, chunk_size=None):
+    """Util method which reads the file in chunk and call load_from_chunk
+    on the blocks of data from given meta_class."""
+    chunk_size = chunk_size or 10 * 1024  # 10 KiB test on small chunks
+    with open(filepath, 'rb') as file:
+        # find out file size
+        file_size = file.seek(0, os.SEEK_END)
+        file.seek(0)
+        while True:
+            chunk = file.read(chunk_size)
+            if not chunk:
+                break
+            meta_class.load_from_chunk(chunk, file_size)
+
+
 def give_cache_version(path, version_to_give):
     """Modifies the cache file and adds a valid version number"""
     with open(path, "r", encoding='utf-8') as cache_file:
         cache = json.load(cache_file)
-    my_cache = {
-        "version": version_to_give
-    }
+    my_cache = {"version": version_to_give}
     my_cache.update(cache)
     with open(path, "w", encoding='utf-8') as cache_file:
         json.dump(my_cache, cache_file)
@@ -136,20 +149,6 @@ def test_get_metadata_invalid_file():
 
 class TestFDNMetaData:
     """Tests for standard gcode metadata."""
-
-    def chunk_read_file(self, meta_class, filepath, chunk_size=None):
-        """Util method which reads the file in chunk and call load_from_chunk
-        on the blocks of data from given meta_class."""
-        chunk_size = chunk_size or 10 * 1024  # 10 KiB test on small chunks
-        with open(filepath, 'rb') as file:
-            # find out file size
-            file_size = file.seek(0, os.SEEK_END)
-            file.seek(0)
-            while True:
-                chunk = file.read(chunk_size)
-                if not chunk:
-                    break
-                meta_class.load_from_chunk(chunk, file_size)
 
     def test_full(self):
         """Both the file and filename contain metadata. There are thumbnails.
@@ -255,7 +254,7 @@ class TestFDNMetaData:
         fname = os.path.join(gcodes_dir,
                              "fdn_full_0.15mm_PETG_MK3S_2h6m.gcode")
         chunk_meta = get_meta_class(fname)
-        self.chunk_read_file(chunk_meta, fname, chunk_size)
+        chunk_read_file(chunk_meta, fname, chunk_size)
         # check that same result came from parsing metadata as a whole file
         meta = get_metadata(fname, False)
         assert meta.thumbnails == chunk_meta.thumbnails
@@ -276,7 +275,7 @@ class TestFDNMetaData:
         fname = os.path.join(gcodes_dir,
                              "fdn_only_filename_0.25mm_PETG_MK3S_2h9m.gcode")
         chunk_meta = get_meta_class(fname)
-        self.chunk_read_file(chunk_meta, fname)
+        chunk_read_file(chunk_meta, fname)
         assert chunk_meta.data == {}
         chunk_meta.load_from_path(fname)
         assert chunk_meta.data == {
@@ -291,7 +290,7 @@ class TestFDNMetaData:
         """Test chunks from file with no metadata."""
         fname = os.path.join(gcodes_dir, "fdn_all_empty.gcode")
         chunk_meta = get_meta_class(fname)
-        self.chunk_read_file(chunk_meta, fname)
+        chunk_read_file(chunk_meta, fname)
         assert chunk_meta.data == {}
 
     def test_from_chunks_invalid_file(self):
@@ -334,3 +333,10 @@ class TestSLMetaData:
 
         assert not meta.data
         assert not meta.thumbnails
+
+    def test_sl1_chunk_read(self):
+        """TODO For now when chunk reading sl file metadata are not loaded"""
+        fname = os.path.join(gcodes_dir, "empty.sl1")
+        chunk_meta = get_meta_class(fname)
+        chunk_read_file(chunk_meta, fname)
+        assert chunk_meta.data == {}
