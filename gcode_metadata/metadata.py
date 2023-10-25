@@ -359,6 +359,12 @@ class MetaData:
         """
         # pylint: disable=unused-argument
 
+    def load_from_chunk(self, data: bytes, size: int):
+        """Process given chunk array of data.
+        :data: data of a chunk.
+        :size: size of the file."""
+        # pylint: disable=unused-argument
+
     def set_data(self, data: Dict):
         """Helper function to save all items from `data` that
         match `self.Attr` in `self.data`.
