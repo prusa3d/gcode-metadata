@@ -10,7 +10,7 @@ def doc():
 
 setup(
     name='py-gcode-metadata',
-    version='0.1.0',
+    version='0.2.0dev',
     packages=['gcode_metadata'],
     url='https://github.com/prusa3d/gcode-metadata',
     license='LGPLv2+',
