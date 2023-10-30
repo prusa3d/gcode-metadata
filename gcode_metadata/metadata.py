@@ -764,7 +764,8 @@ class SLMetaData(MetaData):
         "fileCreationTimestamp": str,
     }
 
-    THUMBNAIL_NAME_PAT = re.compile(r"(?P<dim>\d+x\d+)")
+    THUMBNAIL_NAME_PAT = re.compile(
+        r".*?(?P<dim>\d+x\d+)\.(?P<format>qoi|jpg|png)")
 
     def load(self, save_cache=True):
         """Load metadata"""
@@ -818,11 +819,13 @@ class SLMetaData(MetaData):
         with zipfile.ZipFile(path, "r") as zip_file:
             for info in zip_file.infolist():
                 if info.filename.startswith("thumbnail/"):
-                    data = zip_file.read(info.filename)
-                    data = base64.b64encode(data)
-                    dim = SLMetaData.THUMBNAIL_NAME_PAT.findall(
-                        info.filename)[-1]
-                    thumbnails[dim] = data
+                    match = SLMetaData.THUMBNAIL_NAME_PAT.match(info.filename)
+                    if match:
+                        img_format = match.group("format").upper()
+                        img_dim = match.group("dim")
+                        data = zip_file.read(info.filename)
+                        data = base64.b64encode(data)
+                        thumbnails[f"{img_dim}_{img_format}"] = data
         return thumbnails
 
 

@@ -30,9 +30,7 @@ def give_cache_version(path, version_to_give):
     """Modifies the cache file and adds a valid version number"""
     with open(path, "r", encoding='utf-8') as cache_file:
         cache = json.load(cache_file)
-    my_cache = {
-        "version": version_to_give
-    }
+    my_cache = {"version": version_to_give}
     my_cache.update(cache)
     with open(path, "w", encoding='utf-8') as cache_file:
         json.dump(my_cache, cache_file)
@@ -324,8 +322,8 @@ class TestSLMetaData:
             'fileCreationTimestamp': '2020-09-17 at 13:53:21 UTC'
         }
 
-        assert len(meta.thumbnails["400x400"]) == 19688
-        assert len(meta.thumbnails["800x480"]) == 64524
+        assert len(meta.thumbnails["400x400_PNG"]) == 19688
+        assert len(meta.thumbnails["800x480_PNG"]) == 64524
 
     def test_sl_empty_file(self):
         """Test a file that is empty"""
