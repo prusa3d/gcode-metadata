@@ -323,8 +323,8 @@ class TestSLMetaData:
             'fileCreationTimestamp': '2020-09-17 at 13:53:21 UTC'
         }
 
-        assert len(meta.thumbnails["400x400"]) == 19688
-        assert len(meta.thumbnails["800x480"]) == 64524
+        assert len(meta.thumbnails["400x400_PNG"]) == 19688
+        assert len(meta.thumbnails["800x480_PNG"]) == 64524
 
     def test_sl_empty_file(self):
         """Test a file that is empty"""
