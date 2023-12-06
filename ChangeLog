@@ -1,6 +1,6 @@
 ChangeLog
 =========
-0.2.0dev
+0.2.0alpha1
     * Improve automatic thumbnail and preview selection
     * `sl1s` added as sla extension gcode type
     * Add cache file versioning, distrust cache files with a different version
