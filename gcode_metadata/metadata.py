@@ -342,13 +342,22 @@ class MetaData:
         """Extract and set metadata from `self.path`. Any metadata
         obtained from the path will be overwritten by metadata from
         the file if the metadata is contained there as well"""
+        cache_loaded = False
         if self.is_cache_fresh():
-            self.load_cache()
-        else:
-            self.load_from_path(self.path)
-            self.load_from_file(self.path)
-            if save_cache:
-                self.save_cache()
+            try:
+                self.load_cache()
+                cache_loaded = True
+            except Exception:  # pylint: disable=broad-except
+                log.warning("Failed loading cache for: %s", self.path)
+        if not cache_loaded:
+            try:
+                self.load_from_path(self.path)
+                self.load_from_file(self.path)
+            except Exception:  # pylint: disable=broad-except
+                log.exception("Failed loading metadata from: %s", self.path)
+            else:
+                if save_cache:
+                    self.save_cache()
 
     def load_from_file(self, path: str):
         """Load metadata and thumbnails from given `path`"""

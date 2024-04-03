@@ -54,8 +54,8 @@ def give_cache_version(path, version_to_give):
 def test_get_metadata_file_does_not_exist():
     """Test get_metadata() with a non-existing file"""
     fname = '/somehwere/in/the/rainbow/my.gcode'
-    with pytest.raises(FileNotFoundError):
-        get_metadata(fname)
+    metadata = get_metadata(fname)
+    assert not metadata.data
 
 
 def test_save_cache_empty_file():
