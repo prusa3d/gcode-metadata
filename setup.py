@@ -1,4 +1,6 @@
 """Setup of PrusaConnect SDK for Printer."""
+import re
+
 from setuptools import setup  # type: ignore
 
 
@@ -8,9 +10,14 @@ def doc():
         return readme.read().strip()
 
 
+METADATA = {}
+with open("gcode_metadata/__init__.py", "r", encoding="utf-8") as info:
+    METADATA = dict(re.findall(r'__([a-z_]+)__ = "([^"]+)"', info.read()))
+
+
 setup(
     name='py-gcode-metadata',
-    version='0.2.0dev',
+    version=METADATA["version"],
     packages=['gcode_metadata'],
     url='https://github.com/prusa3d/gcode-metadata',
     license='LGPLv2+',
