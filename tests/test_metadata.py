@@ -162,6 +162,7 @@ class TestFDNMetaData:
         ; temperature = 280,-280,280,280,280
         ; bed_temperature = 90,60,105,105,105
         ; filament_type = PETG;PLA;ASA;PETG;PETG
+        ; extruder_colour = #FF8000;#DB5182;#3EC0FF;#FF4F4F;#FBEB7D
         """
         fname = os.path.join(gcodes_dir, "mmu_attribute_test.gcode")
         meta = get_metadata(fname, False)
@@ -179,6 +180,9 @@ class TestFDNMetaData:
         ]
         assert meta.data['bed_temperature per tool'] == [90, 60, 105, 105, 105]
         assert meta.data['temperature per tool'] == [280, -280, 280, 280, 280]
+        assert meta.data['extruder_colour per tool'] == [
+            '#FF8000', '#DB5182', '#3EC0FF', '#FF4F4F', '#FBEB7D'
+        ]
         # This might be wrong, we might want to not allow negative values,
         # but it's fun, so whatever
         assert meta.data['filament cost'] == 0
@@ -189,6 +193,7 @@ class TestFDNMetaData:
         assert 'filament_type' not in meta.data
         assert 'nozzle_diameter' not in meta.data
         assert 'temperature' not in meta.data
+        assert 'extruder_colour' not in meta.data
 
     def test_full(self):
         """Both the file and filename contain metadata. There are thumbnails.

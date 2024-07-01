@@ -445,6 +445,8 @@ class FDMMetaData(MetaData):
 
     def set_attr(self, name, value):
         """Set an attribute, but add support for mmu list attributes"""
+        if value == '""':  # e.g. when no extruder_colour
+            return
         if name in self.MMUAttrs:
             value_list, single_value = self.MMUAttrs[name].from_string(value)
             mmu_name = get_mmu_name(name)
@@ -490,6 +492,10 @@ class FDMMetaData(MetaData):
                        "nozzle_diameter":
                        MMUAttribute(separator=",",
                                     value_type=float,
+                                    conversion=same_or_nothing),
+                       "extruder_colour":
+                       MMUAttribute(separator=";",
+                                    value_type=str,
                                     conversion=same_or_nothing)
                    }
 
