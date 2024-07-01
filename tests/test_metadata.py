@@ -150,6 +150,51 @@ def test_get_metadata_invalid_file():
 class TestFDNMetaData:
     """Tests for standard gcode metadata."""
 
+    def test_mmu(self):
+        """Test MMU metadata.
+        mmu_full_0.4n_0.15mm_PETG,PLA_MK4ISMMU3_1h16m.gcode
+        ; filament used [mm] = 3067.34, 1274.58, 0.00, 0.00, 0.00
+        ; filament used [cm3] = 1, 2, , , 0.00
+        ; filament used [g] = 9.37, 3.80, 0.00, 0.00, 0.00
+        ; filament cost = 0.26, 0.10, 0.00, 0.00, 0.00
+        ; temperature = 280,-280,280,280,280
+        ; nozzle_diameter = 0.4,0.4,0.4,porkchop,0.4
+        ; temperature = 280,-280,280,280,280
+        ; bed_temperature = 90,60,105,105,105
+        ; filament_type = PETG;PLA;ASA;PETG;PETG
+        ; extruder_colour = #FF8000;#DB5182;#3EC0FF;#FF4F4F;#FBEB7D
+        """
+        fname = os.path.join(gcodes_dir, "mmu_attribute_test.gcode")
+        meta = get_metadata(fname, False)
+        # check mmu data
+        assert meta.data['filament used [mm]'] == 6
+        assert round(meta.data['filament used [g]'], 2) == 42.69
+        assert meta.data['filament used [mm] per tool'] == [
+            1.0, 2.0, 3.0, 0.0, 0.0
+        ]
+        assert meta.data['filament used [g] per tool'] == [
+            27.0, 4.0, 5.0, 5.23, 1.46
+        ]
+        assert meta.data['filament cost per tool'] == [
+            3.0, -3.0, 0.0, 0.0, 0.0
+        ]
+        assert meta.data['bed_temperature per tool'] == [90, 60, 105, 105, 105]
+        assert meta.data['temperature per tool'] == [280, -280, 280, 280, 280]
+        assert meta.data['extruder_colour per tool'] == [
+            '#FF8000', '#DB5182', '#3EC0FF', '#FF4F4F', '#FBEB7D'
+        ]
+        # This might be wrong, we might want to not allow negative values,
+        # but it's fun, so whatever
+        assert meta.data['filament cost'] == 0
+        # if tool specific value are not the same, the value is not added
+        # !!! NOTE but it will still get parsed from the file name, but it
+        # might be good for the backward compatibility
+        assert 'filament used [cm3]' not in meta.data
+        assert 'filament_type' not in meta.data
+        assert 'nozzle_diameter' not in meta.data
+        assert 'temperature' not in meta.data
+        assert 'extruder_colour' not in meta.data
+
     def test_full(self):
         """Both the file and filename contain metadata. There are thumbnails.
         """
@@ -231,21 +276,6 @@ class TestFDNMetaData:
         assert not meta.data
         assert not meta.thumbnails
         assert meta.path == fname
-
-    def test_mmu(self):
-        """test that mmu attributes are parsed correctly"""
-        fname = os.path.join(gcodes_dir, "mmu_attribute_test.gcode")
-        meta = get_metadata(fname, False)
-        assert meta.data['filament used [mm]'] == 6
-        assert round(meta.data['filament used [g]'], 2) == 42.69
-        assert meta.data['bed_temperature'] == 110
-        # This might be wrong, we might want to not allow negative values,
-        # but it's fun, so whatever
-        assert meta.data['filament cost'] == 0
-        assert 'filament used [cm3]' not in meta.data
-        assert 'filament_type' not in meta.data
-        assert 'nozzle_diameter' not in meta.data
-        assert 'temperature' not in meta.data
 
     @pytest.mark.parametrize('chunk_size',
                              [10 * 1024, 20 * 1024 * 1024, 2 * 1024 * 1024])
