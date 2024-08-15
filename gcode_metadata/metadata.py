@@ -11,6 +11,8 @@ from typing import Dict, Any, Type, Callable, List, Optional
 from logging import getLogger
 from importlib.metadata import version
 
+# pylint: disable=too-many-lines
+
 GCODE_EXTENSIONS = (".gcode", ".gc", ".g", ".gco")
 SLA_EXTENSIONS = ("sl1", "sl1s")
 CHARS_TO_REMOVE = ["/", "\\", "\"", "(", ")", "[", "]", "'"]
@@ -23,10 +25,10 @@ RE_ESTIMATED = re.compile(r"((?P<days>[0-9]+)d\s*)?"
                           r"((?P<seconds>[0-9]+)s)?")
 
 PRINTERS = [
-    'MK4IS', 'MK4MMU3', 'MK4', 'MK3SMMU3', 'MK3MMU3', 'MK3SMMU2S', 'MK3MMU2',
-    'MK3S', 'MK3', 'MK2.5SMMU2S', 'MK2.5MMU2', 'MK2.5S', 'MK2.5', 'MK3.5',
-    'MK3.9', 'MINI', 'MINIIS', 'XL5', 'XL4', 'XL3', 'XL2', 'XL', 'iX', 'SL1',
-    'SHELF', 'EXTRACTOR', 'HARVESTER'
+    'MK4IS', 'MK4MMU3', 'MK4', 'MK4S', 'MK4SMMU3', 'MK3SMMU3', 'MK3MMU3',
+    'MK3SMMU2S', 'MK3MMU2', 'MK3S', 'MK3', 'MK2.5SMMU2S', 'MK2.5MMU2',
+    'MK2.5S', 'MK2.5', 'MK3.5', 'MK3.9', 'MINI', 'MINIIS', 'XL5', 'XL4', 'XL3',
+    'XL2', 'XL', 'iX', 'SL1', 'SHELF', 'EXTRACTOR', 'HARVESTER'
 ]
 
 PRINTERS.sort(key=len, reverse=True)
@@ -379,18 +381,14 @@ class MetaData:
         """Helper function to save all items from `data` that
         match `self.Attr` in `self.data`.
         """
-        for attr, conv in self.Attrs.items():
-            val = data.get(attr)
-            if not val:
-                continue
-            try:
-                self.data[attr] = conv(val)
-            except ValueError:
-                log.warning("Could not convert using %s: %s", conv, val)
+        for key, value in data.items():
+            self.set_attr(key, value)
 
     def set_attr(self, name, value):
         """A helper function that saves attributes to `self.data`"""
         if name not in self.Attrs:
+            return
+        if value is None:
             return
         conv = self.Attrs[name]
         try:
@@ -422,15 +420,21 @@ class MMUAttribute:
         self.value_type = value_type
         self.conversion: Callable[[List[Any]], Any] = conversion
 
-    def from_string(self, raw_value):
-        """Parses the value from string, returns the list value as well as a
-        value for a single tool info compatibility"""
-        parsed = []
-        for value in raw_value.split(self.separator):
+    def parse_tools(self, raw_value: Any) -> tuple[list[Any], Any]:
+        """Parses the value from raw_value, returns the list value as well as a
+        value for a single tool info compatibility
+        """
+        try:
+            values = raw_value.split(self.separator)
+        except AttributeError:
+            values = [raw_value]
+
+        parsed: list[Any] = []
+        for value in values:
             try:
                 parsed.append(self.value_type(value))
             except ValueError:
-                return None, None
+                return [], None
         try:
             single_value = self.conversion(parsed)
         except ValueError:
@@ -447,10 +451,12 @@ class FDMMetaData(MetaData):
         """Set an attribute, but add support for mmu list attributes"""
         if value == '""':  # e.g. when no extruder_colour
             return
+        if value is None:
+            return
         if name in self.MMUAttrs:
-            value_list, single_value = self.MMUAttrs[name].from_string(value)
+            value_list, single_value = self.MMUAttrs[name].parse_tools(value)
             mmu_name = get_mmu_name(name)
-            if value_list is not None:
+            if len(value_list) > 1:
                 super().set_attr(mmu_name, value_list)
             if single_value is not None:
                 super().set_attr(name, single_value)
@@ -763,6 +769,34 @@ class FDMMetaData(MetaData):
         return (present / count) * 100
 
 
+class SLKeys:
+    """Class that maps keys from config.json to
+    more readable names"""
+
+    def __init__(self, key_to_parse: str):
+        self.key_to_parse = key_to_parse
+
+    KeyMapping = {
+        "printTime": "estimated_print_time",
+        "expTime": "exposure_time",
+        "expTimeFirst": "exposure_time_first",
+        "layerHeight": "layer_height",
+        "materialName": "material",
+        "printerModel": "printer_model"
+    }
+
+    @staticmethod
+    def keys():
+        """Returns all keys"""
+        return list(SLKeys.KeyMapping.keys()) + list(
+            SLKeys.KeyMapping.values())
+
+    @property
+    def key(self):
+        """Returns correct key"""
+        return self.KeyMapping.get(self.key_to_parse, self.key_to_parse)
+
+
 class SLMetaData(MetaData):
     """Class that can extract available metadata and thumbnails from
     ziparchives used by SL1 slicers"""
@@ -771,22 +805,32 @@ class SLMetaData(MetaData):
     # thumbnails!
 
     Attrs = {
-        "printer_model": str,
-        "printTime": int,
-        "faded_layers": int,
-        "exposure_time": float,
-        "initial_exposure_time": float,
-        "max_initial_exposure_time": float,
-        "max_exposure_time": float,
-        "min_initial_exposure_time": float,
-        "min_exposure_time": float,
+        "estimated_print_time": int,
         "layer_height": float,
-        "materialName": str,
-        "fileCreationTimestamp": str,
+        "material": str,
+        "exposure_time": int,
+        "exposure_time_first": int,
+        "total_layers": int,
+        "total_height": int,
+        "resin_used_ml": int,
+        "printer_model": str,
     }
 
     THUMBNAIL_NAME_PAT = re.compile(
         r".*?(?P<dim>\d+x\d+)\.(?P<format>qoi|jpg|png)")
+
+    def set_attr(self, name, value):
+        """A helper function that saves attributes to `self.data`"""
+        if value is None:
+            return
+        correct_name = SLKeys(name).key
+        if correct_name not in self.Attrs:
+            return
+        conv = self.Attrs[correct_name]
+        try:
+            self.data[correct_name] = conv(value)
+        except ValueError:
+            log.warning("Could not convert using %s: %s", conv, value)
 
     def load(self, save_cache=True):
         """Load metadata"""
@@ -816,16 +860,12 @@ class SLMetaData(MetaData):
             value as value
         """
         # pylint: disable=invalid-name
-        data = {}
+        data: dict = {}
+        file_name = "config.json"
         with zipfile.ZipFile(path, "r") as zip_file:
-            for fn in ("config.ini", "prusaslicer.ini"):
-                config_file = zip_file.read(fn).decode("utf-8")
-                for line in config_file.splitlines():
-                    key, value = line.split(" = ")
-                    try:
-                        data[key] = json.loads(value)
-                    except json.decoder.JSONDecodeError:
-                        data[key] = value
+            if file_name not in zip_file.namelist():
+                return data
+            data = json.loads(zip_file.read(file_name))
         return data
 
     @staticmethod

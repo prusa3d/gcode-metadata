@@ -203,27 +203,19 @@ class TestFDNMetaData:
         meta = get_metadata(fname, False)
         assert meta.data == {
             'bed_temperature': 90,
-            'bed_temperature per tool': [90],
             'brim_width': 0,
             'estimated printing time (normal mode)': '2h 6m 5s',
             'filament cost': 0.41,
-            'filament cost per tool': [0.41],
             'filament used [cm3]': 10.65,
-            'filament used [cm3] per tool': [10.65],
             'filament used [g]': 13.52,
-            'filament used [g] per tool': [13.52],
             'filament used [mm]': 4427.38,
-            'filament used [mm] per tool': [4427.38],
             'filament_type': 'PETG',
-            'filament_type per tool': ['PETG'],
             'fill_density': '20%',
             'nozzle_diameter': 0.4,
-            'nozzle_diameter per tool': [0.4],
             'printer_model': 'MK3S',
             'layer_height': 0.15,
             'support_material': 0,
             'temperature': 250,
-            'temperature per tool': [250],
             'ironing': 0,
             'layer_info_present': True,
             'normal_left_present': True,
@@ -258,14 +250,15 @@ class TestFDNMetaData:
 
     def test_only_path(self):
         """Only the filename contains metadata. There are no thumbnails."""
-        fname = os.path.join(gcodes_dir,
-                             "fdn_only_filename_0.25mm_PETG_MK3S_2h9m.gcode")
+        fname = os.path.join(
+            gcodes_dir, "fdn_only_filename_0.4n_0.25mm_PETG_MK3S_2h9m.gcode")
         meta = get_metadata(fname, False)
         assert meta.data == {
             'estimated printing time (normal mode)': '2h9m',
             'filament_type': 'PETG',
             'printer_model': 'MK3S',
             'layer_height': 0.25,
+            'nozzle_diameter': 0.4,
         }
         assert not meta.thumbnails
 
@@ -302,8 +295,8 @@ class TestFDNMetaData:
 
     def test_from_chunks_meta_only_path(self):
         """Test chunks from file with no metadata."""
-        fname = os.path.join(gcodes_dir,
-                             "fdn_only_filename_0.25mm_PETG_MK3S_2h9m.gcode")
+        fname = os.path.join(
+            gcodes_dir, "fdn_only_filename_0.4n_0.25mm_PETG_MK3S_2h9m.gcode")
         chunk_meta = get_meta_class(fname)
         chunk_read_file(chunk_meta, fname)
         assert chunk_meta.data == {}
@@ -313,6 +306,7 @@ class TestFDNMetaData:
             'filament_type': 'PETG',
             'printer_model': 'MK3S',
             'layer_height': 0.25,
+            'nozzle_diameter': 0.4,
         }
         assert not chunk_meta.thumbnails
 
@@ -335,26 +329,20 @@ class TestSLMetaData:
 
     def test_sl(self):
         """Basic test."""
-        fname = os.path.join(gcodes_dir, "pentagonal-hexecontahedron-1.sl1")
+        fname = os.path.join(gcodes_dir, "Shape-Box.sl1")
         meta = get_metadata(fname, False)
 
         assert meta.data == {
-            'printer_model': 'SL1',
-            'printTime': 8720,
-            'faded_layers': 10,
-            'exposure_time': 7.5,
-            'initial_exposure_time': 35.0,
-            'max_initial_exposure_time': 300.0,
-            'max_exposure_time': 120.0,
-            'min_initial_exposure_time': 1.0,
-            'min_exposure_time': 1.0,
+            'estimated_print_time': 2722,
+            'exposure_time': 2,
+            'exposure_time_first': 25,
             'layer_height': 0.05,
-            'materialName': 'Prusa Orange Tough @0.05',
-            'fileCreationTimestamp': '2020-09-17 at 13:53:21 UTC'
+            'material': 'Prusament Resin Tough Prusa Orange @0.05 SL1S',
+            'printer_model': 'SL1S'
         }
 
-        assert len(meta.thumbnails["400x400_PNG"]) == 19688
-        assert len(meta.thumbnails["800x480_PNG"]) == 64524
+        assert len(meta.thumbnails["400x400_PNG"]) == 26948
+        assert len(meta.thumbnails["800x480_PNG"]) == 77796
 
     def test_sl_empty_file(self):
         """Test a file that is empty"""
@@ -370,3 +358,15 @@ class TestSLMetaData:
         chunk_meta = get_meta_class(fname)
         chunk_read_file(chunk_meta, fname)
         assert chunk_meta.data == {}
+
+    def test_set_attr_same_as_set_data(self):
+        """Test that loading meta through set_attr and set_data
+        gives the same output"""
+        fname = os.path.join(gcodes_dir, "Shape-Box.sl1")
+        meta_from_set_data = get_metadata(fname, False)
+        # read from set_attr
+        meta_cls_for_set_attr = get_meta_class(fname, "Shape-Box.sl1")
+        raw_meta = meta_cls_for_set_attr.extract_metadata(fname)
+        for attr, value in raw_meta.items():
+            meta_cls_for_set_attr.set_attr(attr, value)
+        assert meta_cls_for_set_attr.data == meta_from_set_data.data
