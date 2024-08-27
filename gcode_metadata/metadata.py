@@ -805,7 +805,8 @@ class SLMetaData(MetaData):
     # thumbnails!
 
     Attrs = {
-        "estimated_print_time": float,
+        # to unify sl float with fdm int value
+        "estimated_print_time": lambda x: int(float(x)),
         "layer_height": float,
         "material": str,
         "exposure_time": int,
