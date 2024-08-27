@@ -805,7 +805,7 @@ class SLMetaData(MetaData):
     # thumbnails!
 
     Attrs = {
-        "estimated_print_time": int,
+        "estimated_print_time": float,
         "layer_height": float,
         "material": str,
         "exposure_time": int,
