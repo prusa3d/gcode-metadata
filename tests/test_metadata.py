@@ -333,7 +333,7 @@ class TestSLMetaData:
         meta = get_metadata(fname, False)
 
         assert meta.data == {
-            'estimated_print_time': 2722.16,
+            'estimated_print_time': 2722,
             'exposure_time': 2,
             'exposure_time_first': 25,
             'layer_height': 0.05,
