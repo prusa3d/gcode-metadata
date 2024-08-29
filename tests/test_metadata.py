@@ -338,7 +338,8 @@ class TestSLMetaData:
             'exposure_time_first': 25,
             'layer_height': 0.05,
             'material': 'Prusament Resin Tough Prusa Orange @0.05 SL1S',
-            'printer_model': 'SL1S'
+            'printer_model': 'SL1S',
+            'resin_used_ml': 17.15,
         }
 
         assert len(meta.thumbnails["400x400_PNG"]) == 26948
