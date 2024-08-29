@@ -782,7 +782,8 @@ class SLKeys:
         "expTimeFirst": "exposure_time_first",
         "layerHeight": "layer_height",
         "materialName": "material",
-        "printerModel": "printer_model"
+        "printerModel": "printer_model",
+        "usedMaterial": "resin_used_ml",
     }
 
     @staticmethod
@@ -813,7 +814,8 @@ class SLMetaData(MetaData):
         "exposure_time_first": int,
         "total_layers": int,
         "total_height": int,
-        "resin_used_ml": int,
+        # to unify with filament used [mm] rounded to 2 decimal places
+        "resin_used_ml": lambda x: round(float(x), 2),
         "printer_model": str,
     }
 
