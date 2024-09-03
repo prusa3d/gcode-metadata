@@ -69,7 +69,7 @@ PRINTERS.sort(key=len, reverse=True)
 MATERIALS = [
     'PLA', 'PETG', 'ABS', 'ASA', 'FLEX', 'HIPS', 'EDGE', 'NGEN', 'PA', 'PVA',
     'PCTG', 'PP', 'PC', 'PEBA', 'CPE', 'PVB', 'PET', 'PLA Tough', 'METAL',
-    'TPU', 'NYLON'
+    'TPU', 'NYLON', "IGLIDUR"
 ]
 
 IMAGE_FORMATS = ['PNG', 'JPG']
