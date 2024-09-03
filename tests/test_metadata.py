@@ -163,6 +163,8 @@ class TestFDNMetaData:
         ; bed_temperature = 90,60,105,105,105
         ; filament_type = PETG;PLA;ASA;PETG;PETG
         ; extruder_colour = #FF8000;#DB5182;#3EC0FF;#FF4F4F;#FBEB7D
+        ; nozzle_high_flow = 1,0,0,1,0
+        ; filament_abrasive = 1,1,1,1,1
         """
         fname = os.path.join(gcodes_dir, "mmu_attribute_test.gcode")
         meta = get_metadata(fname, False)
@@ -183,6 +185,10 @@ class TestFDNMetaData:
         assert meta.data['extruder_colour per tool'] == [
             '#FF8000', '#DB5182', '#3EC0FF', '#FF4F4F', '#FBEB7D'
         ]
+        print(meta.data)
+        assert meta.data['filament_abrasive per tool'] == [1, 1, 1, 1, 1]
+        assert meta.data['filament_abrasive'] == 1
+        assert meta.data['nozzle_high_flow per tool'] == [1, 0, 0, 1, 0]
         # This might be wrong, we might want to not allow negative values,
         # but it's fun, so whatever
         assert meta.data['filament cost'] == 0
@@ -205,6 +211,7 @@ class TestFDNMetaData:
             'bed_temperature': 90,
             'brim_width': 0,
             'estimated printing time (normal mode)': '2h 6m 5s',
+            'filament_abrasive': 1,
             'filament cost': 0.41,
             'filament used [cm3]': 10.65,
             'filament used [g]': 13.52,
@@ -212,6 +219,7 @@ class TestFDNMetaData:
             'filament_type': 'PETG',
             'fill_density': '20%',
             'nozzle_diameter': 0.4,
+            'nozzle_high_flow': 0,
             'printer_model': 'MK3S',
             'layer_height': 0.15,
             'support_material': 0,

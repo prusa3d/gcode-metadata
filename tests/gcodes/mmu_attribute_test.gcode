@@ -147977,6 +147977,7 @@ M73 Q100 S0
 ; extrusion_width = 0.45
 ; fan_always_on = 1,1,0,0,0
 ; fan_below_layer_time = 20,100,10,10,10
+; filament_abrasive = 1,1,1,1,1
 ; filament_colour = #FF8000;#FF8000;#FF8000;#FF8000;#FF8000
 ; filament_cooling_final_speed = 2.5,3.5,2.5,2.5,2.5
 ; filament_cooling_initial_speed = 5,10,5,5,5
@@ -148103,6 +148104,7 @@ M73 Q100 S0
 ; multimaterial_purging = 80
 ; notes = 
 ; nozzle_diameter = 0.4,0.4,0.4,porkchop,0.4
+; nozzle_high_flow = 1,0,0,1,0
 ; only_one_perimeter_first_layer = 0
 ; only_retract_when_crossing_perimeters = 0
 ; ooze_prevention = 0
