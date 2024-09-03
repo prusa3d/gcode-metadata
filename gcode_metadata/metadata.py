@@ -502,8 +502,16 @@ class FDMMetaData(MetaData):
                        "extruder_colour":
                        MMUAttribute(separator=";",
                                     value_type=str,
-                                    conversion=same_or_nothing)
-                   }
+                                    conversion=same_or_nothing),
+                       "nozzle_high_flow":
+                       MMUAttribute(separator=",",
+                                    value_type=int,
+                                    conversion=same_or_nothing),
+                       "filament_abrasive":
+                       MMUAttribute(separator=",",
+                                    value_type=int,
+                                    conversion=same_or_nothing),
+    }
 
     # These keys are primary defined by PrusaSlicer
     # Keys ending in "per tool" mean there is a list inside
