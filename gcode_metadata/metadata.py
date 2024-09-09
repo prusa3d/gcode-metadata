@@ -511,7 +511,7 @@ class FDMMetaData(MetaData):
                        MMUAttribute(separator=",",
                                     value_type=int,
                                     conversion=same_or_nothing),
-    }
+                   }
 
     # These keys are primary defined by PrusaSlicer
     # Keys ending in "per tool" mean there is a list inside
@@ -821,7 +821,7 @@ class SLMetaData(MetaData):
         "exposure_time": int,
         "exposure_time_first": int,
         "total_layers": int,
-        "total_height": int,
+        "total_height": float,
         # to unify with filament used [mm] rounded to 2 decimal places
         "resin_used_ml": lambda x: round(float(x), 2),
         "printer_model": str,
