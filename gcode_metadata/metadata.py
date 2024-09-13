@@ -23,12 +23,44 @@ RE_ESTIMATED = re.compile(r"((?P<days>[0-9]+)d\s*)?"
                           r"((?P<hours>[0-9]+)h\s*)?"
                           r"((?P<minutes>[0-9]+)m\s*)?"
                           r"((?P<seconds>[0-9]+)s)?")
-
 PRINTERS = [
-    'MK4IS', 'MK4MMU3', 'MK4', 'MK4S', 'MK4SMMU3', 'MK3SMMU3', 'MK3MMU3',
-    'MK3SMMU2S', 'MK3MMU2', 'MK3S', 'MK3', 'MK2.5SMMU2S', 'MK2.5MMU2',
-    'MK2.5S', 'MK2.5', 'MK3.5', 'MK3.9', 'MINI', 'MINIIS', 'XL5', 'XL4', 'XL3',
-    'XL2', 'XL', 'iX', 'SL1', 'SHELF', 'EXTRACTOR', 'HARVESTER'
+    'HT90',
+    'MK2.5',
+    'MK2.5S',
+    'MK2.5MMU2',
+    'MK2.5SMMU2S',
+    'MK3',
+    'MK3S',
+    'MK3MMU2',
+    'MK3SMMU2S',
+    'MK3MMU3',
+    'MK3SMMU3',
+    'MK3.9',  # no IS in name as it shipped with IS FW
+    'MK3.9MMU3',
+    'MK3.9S',
+    'MK3.9SMMU3',
+    'MK3.5',
+    'MK3.5MMU3',
+    'MK3.5S',
+    'MK3.5SMMU3',
+    'MK4',
+    # 'MK4MMU3',  # MMU3 for MK4 only for MK4IS
+    'MK4ISMMU3',
+    'MK4IS',
+    'MK4S',
+    'MK4SMMU3',  # no IS in name as it shipped with IS FW
+    'MINI',
+    'MINIIS',
+    'XL',
+    'XL2',
+    'XL5',
+    'XLIS',
+    'XL2IS',
+    'XL5IS',
+    'SL1',
+    'SL1S',
+    'M1',
+    'iX',
 ]
 
 PRINTERS.sort(key=len, reverse=True)
