@@ -563,6 +563,7 @@ class FDMMetaData(MetaData):
         "normal_change_in_present": bool,
         "layer_info_present": bool,
         "max_layer_z": float,
+        "objects_info": json.loads,
     }
 
     # Add attributes that have multiple values in MMU print gcodes
