@@ -848,12 +848,12 @@ class SLMetaData(MetaData):
     Attrs = {
         # to unify sl float with fdm int value
         "estimated_print_time": lambda x: int(float(x)),
-        "layer_height": float,
+        "layer_height": float,  # mm
         "material": str,
-        "exposure_time": int,
-        "exposure_time_first": int,
+        "exposure_time": float,  # s
+        "exposure_time_first": float,  # s
         "total_layers": int,
-        "total_height": float,
+        "total_height": float,  # mm
         # to unify with filament used [mm] rounded to 2 decimal places
         "resin_used_ml": lambda x: round(float(x), 2),
         "printer_model": str,
