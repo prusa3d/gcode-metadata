@@ -384,8 +384,8 @@ class TestSLMetaData:
 
         assert meta.data == {
             'estimated_print_time': 2722,
-            'exposure_time': 2,
-            'exposure_time_first': 25,
+            'exposure_time': 2.0,
+            'exposure_time_first': 25.0,
             'layer_height': 0.05,
             'material': 'Prusament Resin Tough Prusa Orange @0.05 SL1S',
             'printer_model': 'SL1S',
