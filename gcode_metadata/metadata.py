@@ -24,6 +24,7 @@ RE_ESTIMATED = re.compile(r"((?P<days>[0-9]+)d\s*)?"
                           r"((?P<minutes>[0-9]+)m\s*)?"
                           r"((?P<seconds>[0-9]+)s)?")
 PRINTERS = [
+    'COREONE',
     'HT90',
     'MK2.5',
     'MK2.5S',
