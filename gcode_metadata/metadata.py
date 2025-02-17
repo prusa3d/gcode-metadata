@@ -14,7 +14,7 @@ from importlib.metadata import version
 # pylint: disable=too-many-lines
 
 GCODE_EXTENSIONS = (".gcode", ".gc", ".g", ".gco")
-SLA_EXTENSIONS = ("sl1", "sl1s")
+SLA_EXTENSIONS = ("sl1", "sl1s", "m1")
 CHARS_TO_REMOVE = ["/", "\\", "\"", "(", ")", "[", "]", "'"]
 
 log = getLogger("connect-printer")
@@ -23,12 +23,45 @@ RE_ESTIMATED = re.compile(r"((?P<days>[0-9]+)d\s*)?"
                           r"((?P<hours>[0-9]+)h\s*)?"
                           r"((?P<minutes>[0-9]+)m\s*)?"
                           r"((?P<seconds>[0-9]+)s)?")
-
 PRINTERS = [
-    'MK4IS', 'MK4MMU3', 'MK4', 'MK4S', 'MK4SMMU3', 'MK3SMMU3', 'MK3MMU3',
-    'MK3SMMU2S', 'MK3MMU2', 'MK3S', 'MK3', 'MK2.5SMMU2S', 'MK2.5MMU2',
-    'MK2.5S', 'MK2.5', 'MK3.5', 'MK3.9', 'MINI', 'MINIIS', 'XL5', 'XL4', 'XL3',
-    'XL2', 'XL', 'iX', 'SL1', 'SHELF', 'EXTRACTOR', 'HARVESTER'
+    'COREONE',
+    'HT90',
+    'MK2.5',
+    'MK2.5S',
+    'MK2.5MMU2',
+    'MK2.5SMMU2S',
+    'MK3',
+    'MK3S',
+    'MK3MMU2',
+    'MK3SMMU2S',
+    'MK3MMU3',
+    'MK3SMMU3',
+    'MK3.9',  # no IS in name as it shipped with IS FW
+    'MK3.9MMU3',
+    'MK3.9S',
+    'MK3.9SMMU3',
+    'MK3.5',
+    'MK3.5MMU3',
+    'MK3.5S',
+    'MK3.5SMMU3',
+    'MK4',
+    # 'MK4MMU3',  # MMU3 for MK4 only for MK4IS
+    'MK4ISMMU3',
+    'MK4IS',
+    'MK4S',
+    'MK4SMMU3',  # no IS in name as it shipped with IS FW
+    'MINI',
+    'MINIIS',
+    'XL',
+    'XL2',
+    'XL5',
+    'XLIS',
+    'XL2IS',
+    'XL5IS',
+    'SL1',
+    'SL1S',
+    'M1',
+    'iX',
 ]
 
 PRINTERS.sort(key=len, reverse=True)
@@ -511,7 +544,7 @@ class FDMMetaData(MetaData):
                        MMUAttribute(separator=",",
                                     value_type=int,
                                     conversion=same_or_nothing),
-    }
+                   }
 
     # These keys are primary defined by PrusaSlicer
     # Keys ending in "per tool" mean there is a list inside
@@ -531,6 +564,7 @@ class FDMMetaData(MetaData):
         "normal_change_in_present": bool,
         "layer_info_present": bool,
         "max_layer_z": float,
+        "objects_info": json.loads,
     }
 
     # Add attributes that have multiple values in MMU print gcodes
@@ -816,12 +850,12 @@ class SLMetaData(MetaData):
     Attrs = {
         # to unify sl float with fdm int value
         "estimated_print_time": lambda x: int(float(x)),
-        "layer_height": float,
+        "layer_height": float,  # mm
         "material": str,
-        "exposure_time": int,
-        "exposure_time_first": int,
+        "exposure_time": float,  # s
+        "exposure_time_first": float,  # s
         "total_layers": int,
-        "total_height": int,
+        "total_height": float,  # mm
         # to unify with filament used [mm] rounded to 2 decimal places
         "resin_used_ml": lambda x: round(float(x), 2),
         "printer_model": str,

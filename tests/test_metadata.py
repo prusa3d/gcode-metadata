@@ -230,6 +230,48 @@ class TestFDNMetaData:
             'normal_percent_present': True,
             'quiet_left_present': True,
             'quiet_percent_present': True,
+            # objects don't match up with the actually printed objects
+            # this is expected - I have copied object info from another file
+            'objects_info': {
+                "objects": [
+                    {
+                        "name": "Shape-Box id:0 copy 0",
+                        "polygon": [
+                            [111.000, 111.000],
+                            [93.000, 111.000],
+                            [93.000, 93.000],
+                            [111.000, 93.000]
+                        ]
+                    },
+                    {
+                        "name": "Shape-Box id:0 copy 1",
+                        "polygon": [
+                            [87.000, 111.000],
+                            [69.000, 111.000],
+                            [69.000, 93.000],
+                            [87.000, 93.000]
+                        ]
+                    },
+                    {
+                        "name": "Shape-Box id:0 copy 2",
+                        "polygon": [
+                            [111.000, 87.000],
+                            [93.000, 87.000],
+                            [93.000, 69.000],
+                            [111.000, 69.000]
+                        ]
+                    },
+                    {
+                        "name": "Shape-Box id:0 copy 3",
+                        "polygon": [
+                            [87.000, 87.000],
+                            [69.000, 87.000],
+                            [69.000, 69.000],
+                            [87.000, 69.000]
+                        ]
+                    }
+                ]
+            }
         }
         assert len(meta.thumbnails['640x480_PNG']) == 158644
 
@@ -342,8 +384,8 @@ class TestSLMetaData:
 
         assert meta.data == {
             'estimated_print_time': 2722,
-            'exposure_time': 2,
-            'exposure_time_first': 25,
+            'exposure_time': 2.0,
+            'exposure_time_first': 25.0,
             'layer_height': 0.05,
             'material': 'Prusament Resin Tough Prusa Orange @0.05 SL1S',
             'printer_model': 'SL1S',
