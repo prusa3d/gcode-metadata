@@ -602,7 +602,7 @@ class FDMMetaData(MetaData):
         "normal_change_in": "normal_change_in_present"
     }
 
-    METADATA_START_OFFSET = 400000  # Read 400KB from the start
+    METADATA_START_OFFSET = 800000  # Read 800KB from the start
     METADATA_END_OFFSET = 40000  # Read 40KB at the end of the file
     # Number of times the search for M73 is going to repeat if info
     # is incomplete
