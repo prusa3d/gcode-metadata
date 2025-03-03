@@ -2,7 +2,7 @@
 
 from .metadata import MetaData, FDMMetaData, SLMetaData, get_metadata, \
     UnknownGcodeFileType, estimated_to_seconds, get_preview, get_icon, \
-    get_meta_class, PRINTERS
+    get_meta_class, PRINTERS, ImageInfo
 
 __version__ = "0.2.1"
 __date__ = "14 Feb 2025"  # version date
@@ -18,5 +18,5 @@ __url__ = "https://github.com/prusa3d/gcode-metadata"
 __all__ = [
     "MetaData", "FDMMetaData", "SLMetaData", "get_metadata",
     "UnknownGcodeFileType", "estimated_to_seconds", "get_preview", "get_icon",
-    "get_meta_class", "PRINTERS"
+    "get_meta_class", "PRINTERS", "ImageInfo"
 ]
