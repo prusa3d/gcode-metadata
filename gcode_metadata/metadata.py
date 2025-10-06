@@ -14,7 +14,7 @@ from importlib.metadata import version
 # pylint: disable=too-many-lines
 
 GCODE_EXTENSIONS = (".gcode", ".gc", ".g", ".gco")
-SLA_EXTENSIONS = ("sl1", "sl1s", "m1")
+SLA_EXTENSIONS = ("sl1", "sl1s", "m1", "sl2", "slx")
 CHARS_TO_REMOVE = ["/", "\\", "\"", "(", ")", "[", "]", "'"]
 
 log = getLogger("connect-printer")
