@@ -864,6 +864,34 @@ class SLMetaData(MetaData):
     THUMBNAIL_NAME_PAT = re.compile(
         r".*?(?P<dim>\d+x\d+)\.(?P<format>qoi|jpg|png)")
 
+    # Caps on unpacked bytes, against archives that deflate kilobytes into
+    # gigabytes. The thumbnail budget covers all members together, since the
+    # archive picks how many there are. Real files: ~3 kB config, <150 kB
+    # thumbnails.
+    MAX_UNPACKED = 4 * 1024 * 1024
+    MAX_CONFIG = 256 * 1024
+
+    @staticmethod
+    def read_capped(zip_file: zipfile.ZipFile, info: zipfile.ZipInfo,
+                    limit: int) -> bytes:
+        """Read `info`, refusing it if it unpacks to more than `limit` bytes.
+
+        The declared size is only an early reject: zipfile truncates to it
+        after decompressing, so the read itself is what bounds memory. The
+        member is read by `info`, not name, as a name resolves to the last
+        duplicate.
+        """
+        if info.file_size > limit:
+            raise ValueError(
+                f"{info.filename} declares {info.file_size} B, over the "
+                f"remaining {limit} B budget")
+        with zip_file.open(info) as member:
+            data = member.read(limit + 1)
+        if len(data) > limit:
+            raise ValueError(
+                f"{info.filename} unpacks past the {limit} B budget")
+        return data
+
     def set_attr(self, name, value):
         """A helper function that saves attributes to `self.data`"""
         if value is None:
@@ -896,8 +924,8 @@ class SLMetaData(MetaData):
 
         self.thumbnails = self.extract_thumbnails(path)
 
-    @staticmethod
-    def extract_metadata(path: str) -> Dict[str, str]:
+    @classmethod
+    def extract_metadata(cls, path: str) -> Dict[str, str]:
         """Extract metadata from `path`.
 
         :param path: zip file
@@ -910,11 +938,12 @@ class SLMetaData(MetaData):
         with zipfile.ZipFile(path, "r") as zip_file:
             if file_name not in zip_file.namelist():
                 return data
-            data = json.loads(zip_file.read(file_name))
+            info = zip_file.getinfo(file_name)
+            data = json.loads(cls.read_capped(zip_file, info, cls.MAX_CONFIG))
         return data
 
-    @staticmethod
-    def extract_thumbnails(path: str) -> Dict[str, bytes]:
+    @classmethod
+    def extract_thumbnails(cls, path: str) -> Dict[str, bytes]:
         """Extract thumbnails from `path`.
 
         :param path: zip file
@@ -922,14 +951,16 @@ class SLMetaData(MetaData):
             encoded image as value.
         """
         thumbnails: Dict[str, bytes] = {}
+        budget = cls.MAX_UNPACKED
         with zipfile.ZipFile(path, "r") as zip_file:
             for info in zip_file.infolist():
                 if info.filename.startswith("thumbnail/"):
-                    match = SLMetaData.THUMBNAIL_NAME_PAT.match(info.filename)
-                    if match:
+                    match = cls.THUMBNAIL_NAME_PAT.match(info.filename)
+                    if match and not info.is_dir():
                         img_format = match.group("format").upper()
                         img_dim = match.group("dim")
-                        data = zip_file.read(info.filename)
+                        data = cls.read_capped(zip_file, info, budget)
+                        budget -= len(data)
                         data = base64.b64encode(data)
                         thumbnails[f"{img_dim}_{img_format}"] = data
         return thumbnails

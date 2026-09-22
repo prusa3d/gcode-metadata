@@ -1,6 +1,9 @@
 """Tests for gcode-metadata tool for g-code files."""
 import json
 import os
+import tracemalloc
+import zipfile
+import zlib
 import tempfile
 import shutil
 from importlib.metadata import version
@@ -10,9 +13,14 @@ import pytest
 
 from gcode_metadata import (get_metadata, UnknownGcodeFileType, MetaData,
                             get_meta_class)
+from gcode_metadata.metadata import SLMetaData
 
 gcodes_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                           "gcodes")
+
+# Smallest config.json that still yields metadata, for synthetic archives
+SL1_CONFIG = {"printerModel": "SL1S", "layerHeight": 0.05}
+PNG_HEADER = b"\x89PNG\r\n\x1a\n"
 
 # pylint: disable=redefined-outer-name
 
@@ -421,3 +429,116 @@ class TestSLMetaData:
         for attr, value in raw_meta.items():
             meta_cls_for_set_attr.set_attr(attr, value)
         assert meta_cls_for_set_attr.data == meta_from_set_data.data
+
+
+class TestSLMetaDataBudget:
+    """Refusal of SL archives that unpack past the budget.
+
+    Asserted on the extractors: `MetaData.load` swallows any parse failure.
+    """
+
+    @staticmethod
+    def archive(tmp_dir, declared=None, stored=None):
+        """Build an .sl1 with `stored` bytes that claims `declared` sizes."""
+        path = os.path.join(tmp_dir, "bomb.sl1")
+        declared = declared or {}
+        stored = stored or {}
+        config = json.dumps(SL1_CONFIG)
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("config.json", config)
+            for name in {**stored, **declared}:
+                if name != "config.json":
+                    archive.writestr(name, stored.get(name, PNG_HEADER))
+            # The central directory is written on close with these sizes.
+            for info in archive.infolist():
+                if info.filename in declared:
+                    info.file_size = declared[info.filename]
+        return path
+
+    def test_oversized_thumbnail_is_refused(self, tmp_dir):
+        """A single thumbnail may not exceed the whole budget."""
+        fname = self.archive(
+            tmp_dir,
+            {"thumbnail/thumbnail400x400.png": SLMetaData.MAX_UNPACKED + 1})
+        with pytest.raises(ValueError, match="thumbnail400x400.png"):
+            SLMetaData.extract_thumbnails(fname)
+
+    def test_oversized_config_is_refused(self, tmp_dir):
+        """config.json has a tighter cap of its own."""
+        fname = self.archive(tmp_dir,
+                             {"config.json": SLMetaData.MAX_CONFIG + 1})
+        with pytest.raises(ValueError, match="config.json"):
+            SLMetaData.extract_metadata(fname)
+
+    def test_many_small_thumbnails_exhaust_the_budget(self, tmp_dir):
+        """Members that are individually harmless still add up."""
+        chunk = SLMetaData.MAX_UNPACKED // 4
+        fname = self.archive(tmp_dir,
+                             stored={
+                                 f"thumbnail/t{index}_100x100.png":
+                                 b"\0" * chunk
+                                 for index in range(8)
+                             })
+        with pytest.raises(ValueError, match="budget"):
+            SLMetaData.extract_thumbnails(fname)
+
+    def test_layer_images_are_not_charged(self, tmp_dir):
+        """Layer images are never read, so their size cannot exhaust it."""
+        fname = self.archive(
+            tmp_dir, {"Shape-Box00001.png": SLMetaData.MAX_UNPACKED * 100})
+        assert not SLMetaData.extract_thumbnails(fname)
+        assert SLMetaData.extract_metadata(fname)["printerModel"] == "SL1S"
+
+    def test_a_subclass_may_tighten_the_budget(self, tmp_dir):
+        """A service sets its own ceiling by overriding the attribute."""
+
+        class StrictSL(SLMetaData):
+            """SL metadata for a service with less memory to spare."""
+            MAX_UNPACKED = 1024
+
+        fname = self.archive(tmp_dir, {"thumbnail/thumbnail400x400.png": 2048})
+        assert SLMetaData.extract_thumbnails(fname)
+        with pytest.raises(ValueError, match="thumbnail400x400.png"):
+            StrictSL.extract_thumbnails(fname)
+
+    @staticmethod
+    def peak_of(call):
+        """Return the peak Python allocation, in bytes, made by `call`."""
+        tracemalloc.start()
+        try:
+            call()
+        finally:
+            peak = tracemalloc.get_traced_memory()[1]
+            tracemalloc.stop()
+        return peak
+
+    def test_a_member_lying_downward_cannot_overrun_memory(self, tmp_dir):
+        """A small declared size must not let a huge payload reach memory."""
+        payload = b"\0" * (32 * 1024 * 1024)
+        path = os.path.join(tmp_dir, "bomb.sl1")
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("config.json", json.dumps(SL1_CONFIG))
+            archive.writestr("thumbnail/thumbnail400x400.png", payload)
+            for info in archive.infolist():
+                if info.filename.startswith("thumbnail/"):
+                    info.file_size = 100
+                    info.CRC = zlib.crc32(payload[:100])
+
+        peak = self.peak_of(lambda: SLMetaData.extract_thumbnails(path))
+        assert peak < 12 * 1024 * 1024
+
+    @pytest.mark.filterwarnings("ignore:Duplicate name")
+    def test_a_duplicate_name_cannot_smuggle_a_payload(self, tmp_dir):
+        """The bytes read must come from the member that was checked."""
+        path = os.path.join(tmp_dir, "bomb.sl1")
+        name = "thumbnail/thumbnail400x400.png"
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("config.json", json.dumps(SL1_CONFIG))
+            archive.writestr(name, PNG_HEADER)
+            archive.writestr(name, b"\0" * (16 * 1024 * 1024))
+
+        def refuse():
+            with pytest.raises(ValueError, match="thumbnail400x400.png"):
+                SLMetaData.extract_thumbnails(path)
+
+        assert self.peak_of(refuse) < 8 * 1024 * 1024
