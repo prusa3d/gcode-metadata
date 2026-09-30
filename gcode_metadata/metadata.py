@@ -623,7 +623,10 @@ class FDMMetaData(MetaData):
     }
 
     METADATA_START_OFFSET = 800000  # Read 800KB from the start
-    METADATA_END_OFFSET = 40000  # Read 40KB at the end of the file
+    # Read 256KB at the end of the file. PrusaSlicer 3.0 writes a JSON copy of
+    # the config (~56KB for 4 tools, growing with the tool count) between
+    # max_layer_z and the INI block, putting max_layer_z ~90KB from the end.
+    METADATA_END_OFFSET = 256000
     # Number of times the search for M73 is going to repeat if info
     # is incomplete
     MAX_M73_SEARCH_BYTES = 100000

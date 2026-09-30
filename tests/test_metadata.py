@@ -329,7 +329,9 @@ class TestFDNMetaData:
 
     def test_prusaslicer_3_gcode(self):
         """A real PrusaSlicer 3.0 gcode: support is read from the named value
-        in its INI block, and the JSON config block adds no stray keys."""
+        in its INI block, the JSON config block adds no stray keys, and
+        max_layer_z, which the JSON block pushes ~90 kB from the end of the
+        file, is still found."""
         fname = os.path.join(
             gcodes_dir, "ps3_support_Sphere_0.2mm_PLA_"
             "COREONE_INDX4T_18m.gcode")
@@ -337,6 +339,7 @@ class TestFDNMetaData:
         assert meta.data["support_material"] == 1
         assert meta.data["printer_model"] == "COREONE_INDX4T"
         assert meta.data["filament used [g]"] == 3.68
+        assert meta.data["max_layer_z"] == 25.0
         known = set(FDMMetaData.Attrs) | {
             f"{name} per tool"
             for name in FDMMetaData.MMUAttrs
