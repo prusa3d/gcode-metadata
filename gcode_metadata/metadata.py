@@ -194,6 +194,26 @@ def same_or_nothing(value_list):
     return value_list[0]
 
 
+def support_material_flag(value: str) -> int:
+    """Read `support_material` as 0/1 in both slicer generations.
+
+    PrusaSlicer 3.0 names the mode; any mode but `none` generates supports,
+    which is what `1` meant before 3.0.
+
+    >>> support_material_flag("1"), support_material_flag("0")
+    (1, 0)
+    >>> support_material_flag("everywhere")
+    1
+    >>> support_material_flag("enforcers_only")
+    1
+    >>> support_material_flag("none")
+    0
+    """
+    if value in ("none", "enforcers_only", "everywhere"):
+        return int(value != "none")
+    return int(value)
+
+
 def extract_data(input_string):
     """Extracts metadata from the filename
         >>> extract_data("HP_PLA,PLA_MK3SMMU3_3h22m.gcode") #doctest: +ELLIPSIS
@@ -554,7 +574,7 @@ class FDMMetaData(MetaData):
         "layer_height": float,
         "fill_density": str,
         "brim_width": int,
-        "support_material": int,
+        "support_material": support_material_flag,
         "ironing": int,
         "quiet_percent_present": bool,
         "quiet_left_present": bool,

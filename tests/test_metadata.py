@@ -13,7 +13,7 @@ import pytest
 
 from gcode_metadata import (get_metadata, UnknownGcodeFileType, MetaData,
                             get_meta_class)
-from gcode_metadata.metadata import SLMetaData
+from gcode_metadata.metadata import FDMMetaData, SLMetaData
 
 gcodes_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                           "gcodes")
@@ -305,6 +305,43 @@ class TestFDNMetaData:
         assert meta.data['ironing'] == 0
         assert meta.data['support_material'] == 0
         assert len(meta.thumbnails['160x120_PNG']) == 5616
+
+    @pytest.mark.parametrize("value, flag", [
+        pytest.param("0", 0, id="2.x off"),
+        pytest.param("1", 1, id="2.x on"),
+        pytest.param("none", 0, id="3.0 off"),
+        pytest.param("enforcers_only", 1, id="3.0 manual only"),
+        pytest.param("everywhere", 1, id="3.0 on"),
+    ])
+    def test_support_material_reads_as_flag(self, value, flag):
+        """3.0 names the support mode, 2.x states 0/1; both read as 0/1."""
+        data = f"; support_material = {value}\n".encode()
+        meta = FDMMetaData("support.gcode")
+        meta.load_from_chunk(data, len(data))
+        assert meta.data["support_material"] == flag
+
+    def test_support_material_unknown_value_is_dropped(self):
+        """An unreadable support value is left out, not guessed."""
+        data = b"; support_material = sometimes\n"
+        meta = FDMMetaData("support.gcode")
+        meta.load_from_chunk(data, len(data))
+        assert "support_material" not in meta.data
+
+    def test_prusaslicer_3_gcode(self):
+        """A real PrusaSlicer 3.0 gcode: support is read from the named value
+        in its INI block, and the JSON config block adds no stray keys."""
+        fname = os.path.join(
+            gcodes_dir, "ps3_support_Sphere_0.2mm_PLA_"
+            "COREONE_INDX4T_18m.gcode")
+        meta = get_metadata(fname, False)
+        assert meta.data["support_material"] == 1
+        assert meta.data["printer_model"] == "COREONE_INDX4T"
+        assert meta.data["filament used [g]"] == 3.68
+        known = set(FDMMetaData.Attrs) | {
+            f"{name} per tool"
+            for name in FDMMetaData.MMUAttrs
+        }
+        assert set(meta.data) <= known
 
     def test_only_path(self):
         """Only the filename contains metadata. There are no thumbnails."""
